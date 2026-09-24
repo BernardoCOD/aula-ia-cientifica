@@ -40,8 +40,8 @@ npx pnpm@10.4.1 check        # verificación de tipos
 | Variable | Uso |
 |---|---|
 | `GEMINI_API_KEY` | Clave gratuita de Gemini: asistente inteligente, Área de consultas, Tutor IA y análisis docente. |
-| `GEMINI_MODEL` | Opcional. Modelo del asistente (por defecto `gemini-3.8-flash`; si se agota su cupo gratuito se prueban `gemini-3.5-flash-lite` y `gemini-2.5-flash`). |
-| `GEMINI_SEARCH_MODEL` | Opcional. Modelo del Área de consultas (por defecto `gemini-2.5-flash`, el que tiene búsqueda de Google gratuita). |
+| `GEMINI_MODEL` | Opcional. Modelo preferido (por defecto `gemma-4-26b-a4b-it`, gratuito y rápido; si está saturado, sin cupo o tarda más de 30 s, se prueban modelos Gemini Flash gratuitos). |
+| `GEMINI_SEARCH` | Opcional. El Área de consultas busca en Wikipedia en español (gratis). Con `google` usa la búsqueda de Google de Gemini, si la cuenta la tiene habilitada. |
 | `ANTHROPIC_API_KEY` | Opcional y de pago: usar Claude en lugar de Gemini (con `AI_PROVIDER=claude` si hay dos claves). |
 | `ANTHROPIC_MODEL` | Opcional. Modelo de Claude (por defecto `claude-opus-5`). |
 | `ANTHROPIC_EFFORT` | Opcional. `low` (por defecto, respuestas de voz más rápidas), `medium` o `high`. |
@@ -102,7 +102,7 @@ respuestas. Esto lo garantiza el servidor aunque el modelo se equivoque.
 
 ## Área de consultas (`/consultas`)
 
-Búsqueda en internet con la IA limitada a temas de la capacitación: IA, uso responsable, prompts,
+Búsqueda en internet (artículos de Wikipedia en español, gratis) con la IA, limitada a temas de la capacitación: IA, uso responsable, prompts,
 verificación de información, privacidad y tecnologías de accesibilidad. Las preguntas no
 relacionadas se rechazan con amabilidad. Cada respuesta se lee en voz alta, muestra sus fuentes y
 queda registrada en la base de datos.

@@ -67,7 +67,8 @@ describe("Gemini (proveedor gratuito)", () => {
     expect(generateContent.mock.calls[1][0].model).toBe(GEMINI_MODELS[1]);
   });
 
-  it("uses Google Search and returns the grounding sources", async () => {
+  it("uses Google Search when GEMINI_SEARCH=google and returns the grounding sources", async () => {
+    process.env.GEMINI_SEARCH = "google";
     generateContent.mockResolvedValue({
       text: "Respuesta",
       candidates: [
@@ -90,5 +91,49 @@ describe("Gemini (proveedor gratuito)", () => {
       text: "Respuesta",
       sources: [{ title: "UNESCO", url: "https://unesco.org/ia" }],
     });
+    delete process.env.GEMINI_SEARCH;
+  });
+
+  it("answers from Spanish Wikipedia articles by default (free search)", async () => {
+    generateContent
+      .mockResolvedValueOnce({ text: '{"queries":["inteligencia artificial"]}' })
+      .mockResolvedValueOnce({ text: "La IA es..." });
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ query: { search: [{ title: "Inteligencia artificial" }] } }))
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            query: {
+              pages: [
+                {
+                  title: "Inteligencia artificial",
+                  extract: "La inteligencia artificial es un campo...",
+                  fullurl: "https://es.wikipedia.org/wiki/Inteligencia_artificial",
+                },
+              ],
+            },
+          })
+        )
+      );
+    const result = await geminiWithWebSearch({
+      system: "s",
+      messages: [{ role: "user", content: "¿Qué es la IA?" }],
+    });
+    expect(fetchMock.mock.calls[0][0]).toContain("es.wikipedia.org");
+    const finalPrompt = JSON.stringify(generateContent.mock.calls[1][0].contents);
+    expect(finalPrompt).toContain("La inteligencia artificial es un campo");
+    expect(result).toEqual({
+      text: "La IA es...",
+      sources: [
+        {
+          title: "Inteligencia artificial (Wikipedia)",
+          url: "https://es.wikipedia.org/wiki/Inteligencia_artificial",
+        },
+      ],
+    });
+    fetchMock.mockRestore();
   });
 });
