@@ -1,99 +1,125 @@
 # Aula IA Científica
 
-Aplicación web educativa que integra un asistente de voz con IA para guiar a estudiantes con
-discapacidad visual o motriz (sin uso de brazos) a través de su capacitación, sin que la
-discapacidad sea una barrera para usar la app.
+**Asistente de voz con inteligencia artificial para capacitación accesible sobre IA a personas con
+discapacidad visual y motriz (Lima, 2026).**
 
-## Instalación
+Aplicación web educativa con un asistente de voz, **Jason**, que permite recorrer y usar toda la
+plataforma sin ver la pantalla ni usar las manos: navega, lee, completa formularios, marca
+alternativas, consulta el progreso guardado en la base de datos y responde preguntas sobre los temas
+de la capacitación. Incluye un **Área de consultas** que busca en internet, con fuentes, temas
+relacionados con la IA.
+
+## Requisitos
+
+- [Node.js](https://nodejs.org) 20 o superior.
+- Google Chrome o Microsoft Edge (el reconocimiento de voz del navegador funciona mejor en ellos).
+- Una clave de la API de Claude: en [console.anthropic.com](https://console.anthropic.com), sección
+  **API Keys**. Sin la clave la app funciona, pero el asistente solo entiende órdenes directas.
+
+## Instalación y uso
 
 ```bash
-pnpm install
-pnpm run db:push   # aplica las migraciones de Drizzle (requiere DATABASE_URL)
-pnpm dev           # entorno de desarrollo (tsx watch), http://localhost:3000 por defecto
-pnpm run build     # build de producción (client con Vite + server con esbuild)
-pnpm start         # sirve el build de dist/
-pnpm test          # corre la suite de vitest
-pnpm run check     # verificación de tipos (tsc --noEmit)
-pnpm format        # prettier --write .
+npx pnpm@10.4.1 install      # instala dependencias (una sola vez)
+copy .env.example .env       # en Windows; en Mac/Linux: cp .env.example .env
 ```
 
-## Variables de entorno
+Abre `.env` y completa al menos `ANTHROPIC_API_KEY`, `ADMIN_PASSWORD` y `JWT_SECRET`. Luego:
+
+```bash
+npx pnpm@10.4.1 dev          # modo desarrollo: http://localhost:3000
+npx pnpm@10.4.1 build        # compila para producción
+npx pnpm@10.4.1 start        # sirve la versión compilada
+npx pnpm@10.4.1 test         # pruebas automáticas
+npx pnpm@10.4.1 check        # verificación de tipos
+```
+
+## Variables de entorno (`.env`)
 
 | Variable | Uso |
 |---|---|
-| `DATABASE_URL` | Conexión MySQL usada por Drizzle ORM (`server/db.ts`). |
-| `JWT_SECRET` | Firma de cookies de sesión. |
-| `VITE_APP_ID`, `OAUTH_SERVER_URL`, `OWNER_OPEN_ID` | Integración con el runtime/OAuth de la plataforma. |
-| `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY` | Credenciales del proveedor de LLM que usa `server/_core/llm.ts` (interpretación de intención por voz y retroalimentación del Tutor IA). Sin esto, el asistente sigue funcionando con los comandos deterministas de `interpretLocalCommand`, pero no con lenguaje libre. |
-| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Credenciales del panel docente (`server/adminAuth.ts`). |
+| `ANTHROPIC_API_KEY` | Clave de Claude: asistente inteligente, Área de consultas, Tutor IA y análisis docente. |
+| `ANTHROPIC_MODEL` | Opcional. Modelo de Claude (por defecto `claude-opus-5`). |
+| `ANTHROPIC_EFFORT` | Opcional. `low` (por defecto, respuestas de voz más rápidas), `medium` o `high`. |
+| `ANTHROPIC_RESEARCH_EFFORT` | Opcional. Esfuerzo del Área de consultas (por defecto `medium`). |
+| `DATABASE_URL` | Archivo de la base de datos SQLite. Por defecto `file:./data/aula.db`. |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Credenciales del panel docente (`/docente`). |
+| `JWT_SECRET` | Firma de las cookies de sesión (texto largo y aleatorio). |
+| `PORT` | Puerto del servidor (por defecto 3000). |
 
-Ninguna clave se expone al navegador: las llamadas al modelo de IA siempre se ejecutan desde el
-servidor (`server/_core/llm.ts`), nunca desde el cliente.
+Las claves nunca llegan al navegador: todas las llamadas a Claude se hacen desde el servidor.
 
-## El asistente de voz: cómo usarlo
+## Base de datos
 
-- Botón flotante **"Hablar con asistente"** (siempre visible) o atajo de teclado
-  **Ctrl + Shift + Espacio** (se conserva también `Alt+Shift+V` como atajo heredado).
-- Comandos en español natural, no solo frases exactas: "quiero comenzar", "llévame a la pantalla
-  inicial", "necesito identificarme" activan la misma intención que "abre identificación".
-- **Lectura resumida por defecto**; decir **"lee todo"** da una lectura detallada y jerárquica
-  (encabezados, pestañas, menús, diálogos, errores, estados de carga, elemento enfocado y todos
-  los controles).
-- **Modo simulación** (botón con ícono de matraz en el panel, o decir "modo simulación"): describe
-  la intención detectada, la confianza, el elemento objetivo, la acción propuesta y el resultado
-  de validación, sin hacer clic, navegar ni modificar datos reales. Pensado para probar el
-  intérprete de forma segura.
-- **Confirmaciones de seguridad**: antes de enviar un formulario, publicar o ejecutar un control
-  marcado como sensible, o cuando la IA tiene baja confianza en su interpretación, el asistente
-  pregunta "¿Confirmas...? Di sí o no" en vez de ejecutar directamente.
-- Al navegar (por voz o por clic) a una pantalla distinta, el asistente detecta el cambio de ruta
-  y anuncia automáticamente el nuevo título y contenido relevante, sin releer todo el DOM.
+SQLite en un solo archivo (`data/aula.db`), sin instalar ningún servidor. Las tablas se crean solas
+al iniciar la app. Guarda estudiantes, progreso por módulo, evaluaciones (pretest y postest),
+actividades, retos, interacciones con el Tutor IA y consultas. Para verla con una interfaz gráfica:
+`npx pnpm@10.4.1 db:studio`. Para empezar de cero, borra la carpeta `data/`.
 
-## Registro de decisiones técnicas
+## El asistente de voz
 
-- **Integración directa en la aplicación, no una extensión aparte.** El lector vive dentro de
-  `client/src/components/VoiceAssistant.tsx`, `client/src/contexts/AssistantContext.tsx` y
-  `client/src/lib/voiceIntents.ts`, reutilizando los nombres y la estructura ya existentes en el
-  proyecto (React + Vite + tRPC + wouter) en vez de introducir una arquitectura paralela.
-- **Dos capas de interpretación.** `interpretLocalCommand` (determinista, en el cliente) cubre las
-  frases más comunes sin depender de la red ni de la IA; si no reconoce el texto, se envía al
-  procedimiento tRPC `assistant.interpretIntent`, que usa un modelo de lenguaje del lado del
-  servidor con una lista cerrada de intenciones (nunca ejecuta código arbitrario).
-- **Confianza como campo de primera clase.** Tanto los comandos locales como la IA devuelven un
-  `confidence` (0 a 1). Cuando la interpretación de un control a activar tiene confianza baja
-  (<0.55), el asistente pide confirmación en vez de actuar, en vez de asumir que acertó.
-- **Segunda barrera de seguridad en modo evaluación.** Independientemente de lo que devuelva el
-  modelo, el servidor bloquea explícitamente intenciones explicativas (`EXPLAIN_CONTENT`,
-  `SIMPLIFY_EXPLANATION`, etc.) cuando `mode === "evaluation"`, para que una alucinación del
-  modelo no filtre respuestas durante una evaluación.
-- **Verificación después de ejecutar, no solo antes.** Al activar un control que es un enlace de
-  navegación interna, el asistente guarda la ruta actual y, si no detecta un cambio de pantalla en
-  ~1.2s, lo informa en vez de dar por hecho que la acción funcionó.
-- **Privacidad por diseño.** No se graba ni se almacena audio ni conversaciones. Los campos de
-  contraseña nunca se leen, se completan ni se envían al modelo (`setFieldValue` los excluye
-  explícitamente y `interpretLocalCommand` usa `DECLINE` ante cualquier mención de credenciales).
-  El panel informa que el texto de la orden y el contexto visible de pantalla se envían a un
-  servicio de IA para interpretar la intención.
+**Cómo activarlo**
+
+- Botón **"Hablar con Jason"** (abajo a la derecha), tecla **Espacio** (cuando no hay un botón o
+  campo enfocado) o **Ctrl + Mayús + Espacio** en cualquier momento. **Escape** lo detiene.
+- **Escucha continua** (botón en el panel): el micrófono queda atento a **"Oye Jason"** en todas las
+  pantallas, incluso al recargar. Pensado para personas que no pueden usar las manos. La primera vez
+  el navegador pide permiso para el micrófono.
+- Tras cada respuesta vuelve a escuchar sin pulsar nada. Después de dos silencios queda en espera.
+
+**Qué puede hacer** (habla con naturalidad, no hay frases fijas)
+
+- Navegar: "abre el módulo tres", "llévame a mis resultados", "quiero hacer el pretest".
+- Leer: "qué hay en la pantalla", "lee todo", "lee la tabla de estudiantes", "repite".
+- Actuar sobre cualquier control: "pulsa continuar", "abre la pestaña retos", "marca la casilla".
+- Formularios: "mi código es A12, estoy en cuarto grado sección C", "escribe en el colegio Virgen
+  del Rosario". Pide confirmación antes de enviar, guardar evaluaciones, borrar o salir.
+- Órdenes de varios pasos: "entra a mi ruta y abre el tutor" (navega, mira la pantalla nueva y sigue).
+- Datos de la base de datos: "cuánto avancé", "qué módulos me faltan", "ya puedo dar el postest".
+- Preguntas sobre los temas de la capacitación: "qué es un prompt", "cómo verifico una fuente".
+- Buscar en internet: "busca en consultas qué herramientas de IA ayudan a personas ciegas".
+- Accesibilidad: "aumenta la letra", "habla más despacio", "para".
+
+**En evaluaciones (pretest y postest)** puede leer preguntas y alternativas, moverse entre ellas y
+marcar la opción que la persona dicte ("opción B", "elijo la tercera"), pero nunca sugiere
+respuestas. Esto lo garantiza el servidor aunque el modelo se equivoque.
+
+**Modo simulación**: describe lo que haría sin tocar la página. Útil para demostraciones.
+
+## Área de consultas (`/consultas`)
+
+Búsqueda en internet con Claude limitada a temas de la capacitación: IA, uso responsable, prompts,
+verificación de información, privacidad y tecnologías de accesibilidad. Las preguntas no
+relacionadas se rechazan con amabilidad. Cada respuesta se lee en voz alta, muestra sus fuentes y
+queda registrada en la base de datos.
+
+## Cómo funciona (decisiones técnicas)
+
+- **Agente con "fotografía" de la pantalla.** En cada orden, el navegador describe la pantalla
+  (`client/src/lib/pageSnapshot.ts`): títulos, texto visible, cada control con un id, sus valores y
+  estados, tablas, diálogos y alertas. El servidor (`server/assistantAgent.ts`) envía eso a Claude
+  con los datos del estudiante y el contenido de los módulos (`shared/course.ts`). Claude responde
+  con salidas estructuradas: qué decir, qué acciones ejecutar y si necesita confirmación. Así el
+  asistente funciona en cualquier pantalla, también en las que se agreguen después, sin programar
+  comandos uno por uno.
+- **Ejecución verificada** (`client/src/lib/pageActions.ts`): clics reales (compatibles con los
+  menús y pestañas de la interfaz), escritura en campos, listas y desplazamiento. Cada acción informa
+  qué pasó; si algo falla, el asistente lo dice en lugar de dar por hecho que funcionó.
+- **Barreras en el servidor, no solo en el prompt**: se descartan acciones sobre controles o rutas
+  inexistentes, y en evaluación se bloquea escribir o marcar alternativas no dictadas.
+- **Doble confirmación**: la pide Claude y, además, el navegador exige confirmar cualquier botón de
+  envío, borrado o salida.
+- **Comandos locales** (`client/src/lib/voiceIntents.ts`): las órdenes más comunes se resuelven al
+  instante en el navegador, sin red, y mantienen la app usable si la IA no está disponible.
+- **Voz en semi dúplex** (`client/src/hooks/useSpeech.ts`): nunca escucha mientras habla, para no
+  oírse a sí mismo; divide las lecturas largas en frases y elige una voz en español latinoamericano.
+- **Privacidad**: no se graba audio. Los campos de contraseña nunca se leen, se escriben ni se
+  envían a la IA.
 
 ## Limitaciones conocidas
 
-- El reconocimiento y la síntesis de voz dependen de la Web Speech API del navegador (mejor
-  soporte en Chrome/Edge de escritorio); en navegadores sin soporte, el asistente ofrece teclado y
-  texto escrito como alternativa y lo anuncia explícitamente.
-- El indicador sonoro del micrófono usa `AudioContext`; algunos navegadores exigen una interacción
-  previa del usuario en la página para permitir audio, por lo que el primer tono puede no sonar
-  hasta que el usuario haya interactuado una vez con la página.
-- La detección de "cambio de pantalla" para el anuncio automático compara la propiedad `route` que
-  cada pantalla publica manualmente; una navegación que solo cambia parámetros de consulta (por
-  ejemplo `/dashboard?tab=resultados`) no dispara el anuncio automático porque la ruta base no
-  cambia (sí se anuncia el mensaje de confirmación normal de la acción).
-- El modo simulación cubre las intenciones que navegan, activan controles o escriben datos; no
-  simula acciones de solo lectura (leer, listar controles, ayuda), que siempre se ejecutan porque
-  no modifican nada.
-- La lista de controles "riesgosos" que piden confirmación se basa en palabras clave
-  (`enviar`, `eliminar`, `publicar`, `descargar`, etc.) y en `type="submit"`; un botón de acción
-  crítica con una etiqueta que no incluya ninguna de esas palabras no activará la confirmación
-  automáticamente y debería etiquetarse explícitamente con `data-ai-action`.
-- La interpretación por IA requiere `BUILT_IN_FORGE_API_URL`/`BUILT_IN_FORGE_API_KEY` configuradas
-  en el servidor; sin ellas, solo funcionan los comandos deterministas de
-  `interpretLocalCommand`.
+- El reconocimiento de voz del navegador necesita internet y funciona mejor en Chrome y Edge.
+- Cada orden al agente tarda unos segundos, porque Claude analiza la pantalla completa.
+- Con el esfuerzo `low` el asistente responde más rápido; si se equivoca en órdenes complejas, prueba
+  `ANTHROPIC_EFFORT=medium`.
+- Mientras el asistente habla no escucha: para interrumpirlo usa Espacio, Escape o el botón.
+- El uso de la API de Claude tiene costo por consulta: revisa el consumo en console.anthropic.com.

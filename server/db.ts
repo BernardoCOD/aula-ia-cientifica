@@ -1,9 +1,14 @@
-import { and, desc, eq, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { desc, eq, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/libsql";
+import { createClient } from "@libsql/client";
+import fs from "node:fs";
+import path from "node:path";
 import {
   activities,
   aiInteractions,
   challenges,
+  consultations,
+  CREATE_TABLES_SQL,
   evaluations,
   InsertUser,
   moduleProgress,
@@ -12,17 +17,39 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
-let _db: ReturnType<typeof drizzle> | null = null;
+type Database = ReturnType<typeof drizzle>;
+let _db: Promise<Database | null> | null = null;
 
-export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try {
-      _db = drizzle(process.env.DATABASE_URL);
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
-      _db = null;
+/** Ruta del archivo SQLite: DATABASE_URL="file:./data/aula.db" por defecto (memoria en las pruebas). */
+function databaseUrl() {
+  const configured = process.env.DATABASE_URL;
+  if (configured?.startsWith("file:") || configured === ":memory:")
+    return configured;
+  if (configured)
+    console.warn(
+      "[Database] DATABASE_URL no es un archivo SQLite (file:...). Se usará ./data/aula.db."
+    );
+  return process.env.VITEST ? ":memory:" : "file:./data/aula.db";
+}
+
+async function openDatabase(): Promise<Database | null> {
+  try {
+    const url = databaseUrl();
+    if (url.startsWith("file:")) {
+      const file = url.slice("file:".length);
+      fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
     }
+    const client = createClient({ url });
+    for (const statement of CREATE_TABLES_SQL) await client.execute(statement);
+    return drizzle(client);
+  } catch (error) {
+    console.warn("[Database] No se pudo abrir la base de datos:", error);
+    return null;
   }
+}
+
+export function getDb() {
+  _db ??= openDatabase();
   return _db;
 }
 
@@ -56,7 +83,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   await db
     .insert(users)
     .values(values)
-    .onDuplicateKeyUpdate({ set: updateSet });
+    .onConflictDoUpdate({ target: users.openId, set: updateSet });
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -101,10 +128,11 @@ export async function upsertStudent(input: {
       .where(eq(students.id, existing.id));
     return { ...existing, ...input };
   }
-  const result = await db
+  const [created] = await db
     .insert(students)
-    .values({ ...input, schoolName: input.schoolName ?? null });
-  return { id: Number(result[0].insertId), ...input };
+    .values({ ...input, schoolName: input.schoolName ?? null })
+    .returning({ id: students.id });
+  return { id: created.id, ...input };
 }
 
 export async function saveProgress(input: {
@@ -125,7 +153,8 @@ export async function saveProgress(input: {
       percentage: input.percentage,
       status: input.status,
     })
-    .onDuplicateKeyUpdate({
+    .onConflictDoUpdate({
+      target: [moduleProgress.studentId, moduleProgress.moduleId],
       set: {
         percentage: input.percentage,
         status: input.status,
@@ -312,4 +341,39 @@ export async function deleteStudentByCode(code: string) {
     await tx.delete(students).where(eq(students.id, student.id));
   });
   return true;
+}
+
+export async function saveConsultation(input: {
+  code?: string;
+  question: string;
+  answer: string;
+  sources: { title: string; url: string }[];
+}) {
+  const db = await getDb();
+  if (!db) return;
+  const student = input.code ? await getStudentByCode(input.code) : undefined;
+  await db.insert(consultations).values({
+    studentId: student?.id ?? null,
+    question: input.question,
+    answer: input.answer,
+    sources: JSON.stringify(input.sources),
+  });
+}
+
+export async function getRecentConsultations(limit = 30) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      id: consultations.id,
+      question: consultations.question,
+      answer: consultations.answer,
+      createdAt: consultations.createdAt,
+      code: students.code,
+    })
+    .from(consultations)
+    .leftJoin(students, eq(consultations.studentId, students.id))
+    .orderBy(desc(consultations.createdAt))
+    .limit(limit);
+  return rows;
 }

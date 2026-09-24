@@ -1,63 +1,9 @@
-// Contrato cerrado de intenciones. La IA interpreta lenguaje natural; la interfaz
-// ejecuta únicamente una intención segura y conocida.
-export type VoiceIntent =
-  | "NAVIGATE_HOME"
-  | "NAVIGATE_MODULE"
-  | "NAVIGATE_PRETEST"
-  | "NAVIGATE_POSTEST"
-  | "NAVIGATE_TUTOR"
-  | "NAVIGATE_IDENTIFICATION"
-  | "NAVIGATE_TEACHER"
-  | "OPEN_MENU"
-  | "OPEN_RESULTS"
-  | "NEXT_CONTENT"
-  | "PREVIOUS_CONTENT"
-  | "GO_TO_QUESTION"
-  | "REPEAT_CONTENT"
-  | "READ_SCREEN"
-  | "READ_SCREEN_FULL"
-  | "READ_CONTENT"
-  | "EXPLAIN_CONTENT"
-  | "SIMPLIFY_EXPLANATION"
-  | "START_ACTIVITY"
-  | "SELECT_OPTION"
-  | "WRITE_TEXT"
-  | "FILL_FORM"
-  | "LIST_CONTROLS"
-  | "ACTIVATE_CONTROL"
-  | "ACTIVATE_ASSISTANT"
-  | "STOP_ASSISTANT"
-  | "FOCUS_NEXT"
-  | "FOCUS_PREVIOUS"
-  | "ACTIVATE_FOCUSED"
-  | "TEXT_SCALE_UP"
-  | "TEXT_SCALE_DOWN"
-  | "PAUSE"
-  | "RESUME"
-  | "GO_BACK"
-  | "HELP"
-  | "CURRENT_MODULE"
-  | "CURRENT_CONTENT"
-  | "LIST_MODULES"
-  | "START_LEARNING"
-  | "CONFIRM_LOGOUT"
-  | "TOGGLE_SIMULATION"
-  | "DECLINE"
-  | "UNKNOWN";
+// Comandos de voz locales: se reconocen al instante en el navegador, sin red ni IA, y mantienen
+// la app usable aunque el servicio de IA falle. Todo lo demás lo interpreta el agente de IA.
+// Solo se incluyen frases inequívocas: ante la duda, la orden pasa al agente, que ve la pantalla.
 
-export type AssistantMode = "learning" | "evaluation";
-export type IntentResult = {
-  intent: VoiceIntent;
-  moduleNumber: number;
-  optionLetter: "A" | "B" | "C" | "D" | "";
-  message: string;
-  value?: string;
-  controlTarget?: string;
-  questionIndex?: number;
-  fields?: Record<string, string>;
-  /** Certeza estimada de la interpretación (0 a 1). Los comandos locales deterministas usan valores altos; la IA estima la suya. */
-  confidence?: number;
-};
+export type { AssistantMode } from "@shared/assistant";
+import type { AssistantMode } from "@shared/assistant";
 
 export type AssistantScreenContext = {
   mode: AssistantMode;
@@ -76,284 +22,156 @@ export type AssistantHandlers = {
   onPrevious?: () => void;
   onGoToQuestion?: (index: number) => void;
   onContinue?: () => void;
-  onSelectOption?: (letter: "A" | "B" | "C" | "D") => void;
+  onSelectOption?: (letter: OptionLetter) => void;
   onStartActivity?: () => void;
-  onSelectTab?: (tab: string) => void;
 };
+
+export type OptionLetter = "A" | "B" | "C" | "D";
+
+export type LocalCommand =
+  | { kind: "wake" }
+  | { kind: "stop_assistant" }
+  | { kind: "pause" }
+  | { kind: "repeat" }
+  | { kind: "read"; full: boolean }
+  | { kind: "text_size"; direction: 1 | -1 }
+  | { kind: "speech_rate"; value: "slower" | "faster" | "normal" }
+  | { kind: "help" }
+  | { kind: "simulation" }
+  | { kind: "decline"; message: string }
+  | { kind: "select_option"; letter: OptionLetter }
+  | { kind: "next_question" }
+  | { kind: "previous_question" }
+  | { kind: "go_to_question"; index: number }
+  | { kind: "read_question" }
+  | { kind: "navigate"; path: string; label: string }
+  | { kind: "back" };
+
+export const ASSISTANT_NAME = "Jason";
 
 export const HELP_MESSAGE =
-  "Puedes decir: abrir Tutor IA, comenzar capacitación, abrir módulo dos, abrir pretest, abrir postest, ver resultados, qué módulos hay, activar texto a voz, lee todo para una lectura detallada, responder pregunta dos, qué botones hay, presiona continuar, enfoca siguiente control, aumentar letra o volver. Presiona Espacio para iniciar la conversación; cuando termine, di OK Jason o Hey Jason para reactivarla. Di detener asistente para terminar.";
-export const NOT_UNDERSTOOD_MESSAGE =
-  "No logré entenderte. Puedes decir: lee la pantalla, continuar, volver al inicio o qué puedo hacer.";
-export const RECOGNITION_ERROR_MESSAGE =
-  "Parece que no pude reconocer tu voz. Puedes intentarlo nuevamente o utilizar el teclado.";
-export const AI_ERROR_MESSAGE =
-  "El asistente inteligente no está disponible ahora. Puedes continuar con el teclado, los enlaces o el lector de pantalla.";
+  "Puedes hablarme con naturalidad. Por ejemplo: abre el módulo dos, qué hay en la pantalla, lee todo, llévame a mis resultados, escribe mi código A12 en el campo del estudiante, cuánto avancé, qué es un prompt, o busca en consultas cómo verificar una noticia. En las evaluaciones di: lee la pregunta, opción B o siguiente pregunta. Para detener la lectura di para. Para que deje de escucharte di detener asistente.";
+export const AI_UNAVAILABLE_MESSAGE =
+  "El asistente inteligente no está disponible en este momento. Puedo seguir ayudándote con órdenes directas como: abre el módulo dos, lee la pantalla, siguiente pregunta o ve al inicio.";
 export const UNSUPPORTED_BROWSER_MESSAGE =
-  "Tu navegador no admite reconocimiento de voz. Puedes escribir el comando o usar el teclado y los enlaces de la pantalla.";
+  "Este navegador no reconoce la voz. Usa Google Chrome o Microsoft Edge, o escribe tu orden en el cuadro de texto.";
 
-const normalize = (value: string) =>
-  value.toLocaleLowerCase("es").normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-const numberWords: Record<string, number> = {
-  uno: 1,
-  una: 1,
-  dos: 2,
-  tres: 3,
-  cuatro: 4,
-  cinco: 5,
-  seis: 6,
+export const normalizeSpeech = (value: string) =>
+  value
+    .toLocaleLowerCase("es")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[¿?¡!.,;:"]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const NUMBER_WORDS: Record<string, number> = {
+  uno: 1, una: 1, primera: 1, primero: 1,
+  dos: 2, segunda: 2, segundo: 2,
+  tres: 3, tercera: 3, tercero: 3,
+  cuatro: 4, cuarta: 4, cuarto: 4,
+  cinco: 5, quinta: 5, quinto: 5,
+  seis: 6, sexta: 6, sexto: 6,
+  siete: 7, ocho: 8, nueve: 9, diez: 10,
 };
-const questionNumber = (value: string) =>
-  Number(value) || numberWords[value] || 0;
+const toNumber = (word: string) => Number(word) || NUMBER_WORDS[word] || 0;
+const NUMBER = "(\\d+|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|primera|primero|segunda|segundo|tercera|tercero|cuarta|cuarto|quinta|quinto|sexta|sexto)";
 
-/** Comandos deterministas: mantienen usable la app aunque la IA o internet fallen. */
-export function interpretLocalCommand(text: string): IntentResult | null {
-  const value = normalize(text);
-  const rawText = text.trim();
-  // Los comandos deterministas reconocidos por patrón son de alta confianza; los que dependen
-  // de un nombre libre dictado por la persona (botón, campo) son algo menos seguros.
-  const result = (
-    intent: VoiceIntent,
-    message: string,
-    extra: Partial<IntentResult> = {}
-  ): IntentResult => ({
-    intent,
-    moduleNumber: 0,
-    optionLetter: "",
-    message,
-    confidence: 0.95,
-    ...extra,
-  });
-  if (
-    /(contraseña|contrasena|clave|password|token|codigo de acceso)/.test(value)
-  )
-    return result(
-      "DECLINE",
-      "No puedo leer, repetir ni procesar credenciales. Puedes pedirme que enfoque el campo correspondiente."
-    );
-  if (
-    /(modo simulacion|modo simulación|simular acciones|activar simulacion|activar simulación|desactivar simulacion|desactivar simulación)/.test(
-      value
-    )
-  )
-    return result("TOGGLE_SIMULATION", "Cambiaré el modo simulación.");
-  if (
-    /(activar asistente|hablar con ia|oye aula ia|ok yeison|hey yeison|oye yeison|ok jason|hey jason|oye jason|modo conversacion|modo conversación)/.test(
-      value
-    )
-  )
-    return result("ACTIVATE_ASSISTANT", "Asistente conversacional activado.");
-  if (
-    /(desactivar asistente|detener conversacion|detener conversación|silenciar asistente)/.test(
-      value
-    )
-  )
-    return result("STOP_ASSISTANT", "Modo conversacional desactivado.");
-  if (
-    /(tutor ia|tutor inteligente|tutor de ia|ayuda personalizada|retroalimentacion|retroalimentación)/.test(
-      value
-    )
-  )
-    return result("NAVIGATE_TUTOR", "Abriré el Tutor IA.");
-  if (
-    /(identificarme|identificacion|identificación|registrarme|datos del estudiante)/.test(
-      value
-    )
-  )
-    return result(
-      "NAVIGATE_IDENTIFICATION",
-      "Abriré la identificación del estudiante."
-    );
-  if (/(panel docente|vista docente|espacio del profesor)/.test(value))
-    return result("NAVIGATE_TEACHER", "Abriré el panel docente.");
-  if (
-    /(que modulos hay|qué módulos hay|lista de modulos|lista de módulos|mis modulos|mis módulos)/.test(
-      value
-    )
-  )
-    return result("LIST_MODULES", "Te diré los módulos disponibles.");
-  if (
-    /(pregunta siguiente|siguiente pregunta|avanza a la siguiente pregunta)/.test(
-      value
-    )
-  )
-    return result("NEXT_CONTENT", "Iré a la siguiente pregunta.");
-  if (
-    /(pregunta anterior|anterior pregunta|vuelve a la pregunta anterior)/.test(
-      value
-    )
-  )
-    return result("PREVIOUS_CONTENT", "Volveré a la pregunta anterior.");
-  const questionMatch = value.match(
-    /(?:responder|responde|contestar|contesta|ir a|ve a|pasar a|abrir)\s+(?:la\s+)?pregunta\s+(\d+|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)/
-  );
-  if (questionMatch) {
-    const number = questionNumber(questionMatch[1]);
-    return number > 0
-      ? result("GO_TO_QUESTION", `Iré a la pregunta ${number}.`, {
-          questionIndex: number - 1,
-        })
-      : null;
+// Frases de activación. El reconocimiento suele transcribir "Jason" como "yeison" o "jeison".
+export const WAKE_PATTERN =
+  /\b(?:ok|okey|oye|hey|hola|ey)\s+(?:jason|yeison|jeison|jaison|jayson|aula)\b\s*(.*)$/;
+
+const GO = "(?:abre|abrir|ir a|ir al|ve a|ve al|vamos a|vamos al|llevame a|llevame al|quiero ir a|quiero ir al|entra a|entra al|entrar a|entrar al|muestrame|mostrar|pasa a|pasa al|regresa a|regresa al|volver a|volver al|vuelve a|vuelve al)";
+
+const ROUTES: { pattern: RegExp; path: string; label: string }[] = [
+  { pattern: /^(?:la )?(?:pagina de )?inicio$|^(?:la )?pagina principal$/, path: "/", label: "el inicio" },
+  { pattern: /^(?:mi )?(?:ruta|panel(?: del estudiante)?|menu(?: principal)?|tablero)$/, path: "/dashboard", label: "tu ruta de aprendizaje" },
+  { pattern: /^(?:el )?tutor(?: ia| de ia| inteligente)?$/, path: "/tutor", label: "el Tutor IA" },
+  { pattern: /^(?:el )?(?:pretest|diagnostico|prueba inicial|evaluacion inicial)$/, path: "/diagnostico", label: "el pretest" },
+  { pattern: /^(?:el )?(?:postest|evaluacion final|prueba final)$/, path: "/postest", label: "la evaluación final" },
+  { pattern: /^(?:la )?(?:identificacion|ficha|registro)$/, path: "/identificacion", label: "la identificación" },
+  { pattern: /^(?:el )?panel (?:docente|del docente|del profesor)$/, path: "/docente", label: "el panel docente" },
+  { pattern: /^(?:el )?(?:area de )?consultas?$/, path: "/consultas", label: "el Área de consultas" },
+  { pattern: /^(?:mis )?resultados$|^mi progreso$/, path: "/dashboard?tab=resultados", label: "tus resultados" },
+];
+
+export function interpretLocalCommand(
+  text: string,
+  options: { inQuestion?: boolean } = {}
+): LocalCommand | null {
+  const value = normalizeSpeech(text);
+  if (!value) return null;
+
+  // Privacidad: nada que mencione credenciales se procesa ni se envía a la IA.
+  if (/\b(contrasena|password|clave secreta|mi clave|token)\b/.test(value))
+    return {
+      kind: "decline",
+      message:
+        "Por tu seguridad no leo, escribo ni envío contraseñas. Puedo enfocar el campo para que tú o una persona de confianza la escriba.",
+    };
+
+  if (/^(?:ok |oye |hey )?(?:jason |yeison )?(?:detener|desactivar|apagar|terminar|cerrar) (?:el )?asistente$|^deja de escuchar(?:me)?$|^(?:adios|chau|hasta luego)(?: jason| yeison)?$/.test(value))
+    return { kind: "stop_assistant" };
+  if (WAKE_PATTERN.test(value) && !WAKE_PATTERN.exec(value)?.[1]?.trim())
+    return { kind: "wake" };
+  if (/^(?:para|pausa|pausar|silencio|callate|detente|basta|alto|stop|deja de leer|deten la lectura|detener lectura)$/.test(value))
+    return { kind: "pause" };
+  if (/^(?:repite|repitelo|repetir|otra vez|que dijiste|puedes repetir)$/.test(value))
+    return { kind: "repeat" };
+  if (/^(?:lee|leer|leeme) (?:todo|toda la pantalla|todo el contenido)$|^lectura (?:completa|detallada)$|^describeme todo$/.test(value))
+    return { kind: "read", full: true };
+  if (/^(?:lee|leer|leeme) (?:la )?(?:pantalla|pagina)$|^(?:activa|activar|enciende) (?:el )?texto a voz$/.test(value))
+    return { kind: "read", full: false };
+  if (/(?:aumenta|aumentar|agranda|agrandar|sube|subir|mas grande).*(?:letra|texto)|letra mas grande/.test(value))
+    return { kind: "text_size", direction: 1 };
+  if (/(?:disminuye|disminuir|reduce|reducir|achica|baja|bajar).*(?:letra|texto)|letra mas pequena/.test(value))
+    return { kind: "text_size", direction: -1 };
+  if (/(?:habla|hablar|lee|leer)? ?mas (?:lento|despacio)$/.test(value))
+    return { kind: "speech_rate", value: "slower" };
+  if (/(?:habla|hablar|lee|leer)? ?mas rapido$/.test(value))
+    return { kind: "speech_rate", value: "faster" };
+  if (/^(?:velocidad normal|habla normal)$/.test(value))
+    return { kind: "speech_rate", value: "normal" };
+  if (/^(?:ayuda|que puedo decir|que puedo hacer|comandos|que comandos hay)$/.test(value))
+    return { kind: "help" };
+  if (/\bmodo simulacion\b/.test(value)) return { kind: "simulation" };
+
+  if (options.inQuestion) {
+    const option =
+      value.match(/^(?:la )?(?:opcion|alternativa|letra|respuesta)? ?([abcd])$/) ??
+      value.match(/(?:opcion|alternativa|letra|marca|marco|marcar|elijo|elige|selecciona|respondo|responde)(?: la)?(?: opcion| alternativa| letra)? ([abcd])\b/);
+    if (option)
+      return { kind: "select_option", letter: option[1].toUpperCase() as OptionLetter };
+    const ordinal = value.match(/(?:elijo|elige|selecciona|marca|marco|responde|respondo|opcion|alternativa)(?: la)? (primera|segunda|tercera|cuarta)\b/);
+    if (ordinal)
+      return {
+        kind: "select_option",
+        letter: "ABCD"[toNumber(ordinal[1]) - 1] as OptionLetter,
+      };
+    if (/^(?:siguiente pregunta|pregunta siguiente|siguiente|proxima pregunta|avanza)$/.test(value))
+      return { kind: "next_question" };
+    if (/^(?:pregunta anterior|anterior pregunta|anterior|regresa a la pregunta anterior)$/.test(value))
+      return { kind: "previous_question" };
+    const question = value.match(new RegExp(`(?:ir a|ve a|pasa a|abre|responder|contestar)(?: la)? pregunta ${NUMBER}\\b`));
+    if (question && toNumber(question[1]) > 0)
+      return { kind: "go_to_question", index: toNumber(question[1]) - 1 };
+    if (/^(?:lee|leer|leeme|repite|repetir)(?: otra vez)? la pregunta$|^(?:cual es )?la pregunta$/.test(value))
+      return { kind: "read_question" };
   }
-  const spokenOption = rawText.match(
-    /(?:responde|elige|selecciona)\s+(?:la\s+)?(?:opcion|opción|alternativa)?\s*(primera|segunda|tercera|cuarta|[abcd])\b/i
-  );
-  if (spokenOption) {
-    const letter =
-      (
-        { primera: "A", segunda: "B", tercera: "C", cuarta: "D" } as Record<
-          string,
-          string
-        >
-      )[spokenOption[1].toLowerCase()] ?? spokenOption[1].toUpperCase();
-    return result("SELECT_OPTION", `Seleccionaré la opción ${letter}.`, {
-      optionLetter: letter as "A" | "B" | "C" | "D",
-    });
-  }
-  const targetedWrite = rawText.match(
-    /en\s+(?:el|la)\s+(?:apartado|campo|seccion|sección)(?:\s+de)?\s+(.+?)\s+(?:escribe|escribir|responde|responder|contesta|contestar|rellena|rellenar)\s+(.+)$/i
-  );
-  if (targetedWrite)
-    return result("WRITE_TEXT", `Escribiré en ${targetedWrite[1].trim()}.`, {
-      controlTarget: targetedWrite[1].trim(),
-      value: targetedWrite[2].trim(),
-      confidence: 0.85,
-    });
-  const completeMatch = rawText.match(
-    /completa(?:r)?\s+estudiante\s+(.+?)(?:\s+colegio\s+(.+))?$/i
-  );
-  if (completeMatch)
-    return result("FILL_FORM", "Completaré los campos permitidos.", {
-      fields: {
-        student: completeMatch[1].trim(),
-        ...(completeMatch[2] ? { school: completeMatch[2].trim() } : {}),
-      },
-      confidence: 0.85,
-    });
-  const writeMatch = rawText.match(
-    /(?:escribe|escribir|dicta|dictar|responde|responder|contesta|contestar|rellena|rellenar)\s+(.+)/i
-  );
-  if (writeMatch)
-    return result("WRITE_TEXT", "Escribiré el texto en el campo activo.", {
-      value: writeMatch[1].trim(),
-      confidence: 0.8,
-    });
-  if (
-    /(que botones hay|qué botones hay|que controles hay|qué controles hay|leer botones|leer controles)/.test(
-      value
-    )
-  )
-    return result(
-      "LIST_CONTROLS",
-      "Te diré los botones y controles disponibles."
-    );
-  if (/^(pausa|silencio|deten|detener|para la lectura)/.test(value))
-    return result("PAUSE", "Lectura pausada.");
-  if (/(continua leyendo|reanuda|reanudar lectura|sigue leyendo)/.test(value))
-    return result("RESUME", "Continúo leyendo.");
-  if (
-    /(lee todo|leelo todo|léelo todo|leer todo|lectura completa|lectura detallada|describe todo|describeme todo|descríbeme todo)/.test(
-      value
-    )
-  )
-    return result(
-      "READ_SCREEN_FULL",
-      "Te daré una lectura detallada y completa de esta pantalla."
-    );
-  if (
-    /(lee|leer|activa|activar|enciende|encender)\s*(en voz alta|texto a voz|lectura|la lectura|la pantalla|la pagina|la página)?|que hay en pantalla/.test(
-      value
-    )
-  )
-    return result(
-      "READ_SCREEN",
-      "Leeré la información relevante de esta pantalla."
-    );
-  if (/(desactivar lectura|silencio|detener lectura)/.test(value))
-    return result("PAUSE", "Lectura pausada.");
-  if (/(donde estoy|en que pantalla|ubicacion|ubicación)/.test(value))
-    return result("CURRENT_CONTENT", "Voy a decirte dónde estás.");
-  if (/(que puedo hacer|qué puedo hacer|ayuda|comandos)/.test(value))
-    return result("HELP", HELP_MESSAGE);
-  if (/^(repetir|repite|otra vez)/.test(value))
-    return result("REPEAT_CONTENT", "Repetiré la información anterior.");
-  if (
-    /(aumentar|aumenta|agrandar|grande).*(letra|texto)|letra mas grande/.test(
-      value
-    )
-  )
-    return result("TEXT_SCALE_UP", "Aumentaré el tamaño del texto.");
-  if (
-    /(disminuir|disminuye|reducir|pequena|pequeña).*(letra|texto)|letra mas pequena/.test(
-      value
-    )
-  )
-    return result("TEXT_SCALE_DOWN", "Disminuiré el tamaño del texto.");
-  if (/(enfoca|enfocar|siguiente control|siguiente elemento)/.test(value))
-    return result("FOCUS_NEXT", "Enfocaré el siguiente control.");
-  if (/(control anterior|elemento anterior|enfoca anterior)/.test(value))
-    return result("FOCUS_PREVIOUS", "Enfocaré el control anterior.");
-  if (
-    /(activar|presionar|seleccionar|elegir) (el )?(control|boton|botón|enlace) actual|activar/.test(
-      value
-    )
-  )
-    return result("ACTIVATE_FOCUSED", "Activaré el control enfocado.");
-  if (/(opcion|opción|alternativa)\s*([abcd])\b/.test(value))
-    return result("SELECT_OPTION", "Registraré la opción que indicaste.", {
-      optionLetter: value
-        .match(/(?:opcion|opción|alternativa)\s*([abcd])\b/)?.[1]
-        .toUpperCase() as "A" | "B" | "C" | "D",
-    });
-  const moduleMatch = value.match(
-    /(?:modulo|módulo)\s*(\d|uno|una|dos|tres|cuatro|cinco|seis)/
-  );
+
+  if (/^(?:volver|regresar|atras|ve atras|vuelve atras|regresa)$/.test(value))
+    return { kind: "back" };
+  const moduleMatch = value.match(new RegExp(`^${GO}? ?(?:el )?modulo ${NUMBER}$`));
   if (moduleMatch) {
-    const moduleNumber =
-      Number(moduleMatch[1]) || numberWords[moduleMatch[1]] || 0;
-    return result("NAVIGATE_MODULE", `Abriré el módulo ${moduleNumber}.`, {
-      moduleNumber,
-    });
+    const number = toNumber(moduleMatch[1]);
+    if (number >= 1 && number <= 6)
+      return { kind: "navigate", path: `/modulo/m${number}`, label: `el módulo ${number}` };
   }
-  const activateMatch = value.match(
-    /(?:presiona|presionar|pulsa|pulsar|activa|activar|abre|abrir)\s+(?:el|la)?\s*(boton|botón|enlace)?\s*(.+)$/
-  );
-  if (activateMatch && activateMatch[2])
-    return result("ACTIVATE_CONTROL", `Buscaré ${activateMatch[2].trim()}.`, {
-      controlTarget: activateMatch[2].trim(),
-      confidence: 0.8,
-    });
-  if (/(pretest|diagnostico|diagnóstico|prueba inicial)/.test(value))
-    return result("NAVIGATE_PRETEST", "Abriré el diagnóstico inicial.");
-  if (/(postest|evaluacion final|evaluación final|prueba final)/.test(value))
-    return result("NAVIGATE_POSTEST", "Abriré la evaluación final.");
-  if (/(resultado|progreso|avance)/.test(value))
-    return result("OPEN_RESULTS", "Abriré tus resultados y progreso.");
-  if (/(menu|menú|panel principal|mi ruta)/.test(value))
-    return result("OPEN_MENU", "Abriré el menú principal.");
-  if (/(inicio|página principal|pagina principal|home)/.test(value))
-    return result("NAVIGATE_HOME", "Volveré al inicio.");
-  if (/(volver|regresar|atrás|atras)/.test(value))
-    return result("GO_BACK", "Volveré a la pantalla anterior.");
-  if (/(continuar|siguiente|avanzar|sigue)/.test(value))
-    return result("NEXT_CONTENT", "Continuaré con el siguiente paso.");
-  if (/(anterior|retroceder)/.test(value))
-    return result("PREVIOUS_CONTENT", "Volveré al paso anterior.");
-  if (
-    /(estudiar|comenzar capacitacion|comenzar capacitación|quiero aprender)/.test(
-      value
-    )
-  )
-    return result("START_LEARNING", "Abriré tu capacitación.");
-  if (/(salir|cerrar sesion|cerrar sesión)/.test(value))
-    return result(
-      "CONFIRM_LOGOUT",
-      "Puedo ayudarte a cerrar sesión. Confirma diciendo: confirmar salida."
-    );
-  if (/confirmar salida/.test(value))
-    return result(
-      "CONFIRM_LOGOUT",
-      "La salida debe confirmarse desde el botón de la pantalla por seguridad."
-    );
+  const go = value.match(new RegExp(`^${GO} (.+)$`));
+  if (go) {
+    const destination = go[1].replace(/^(?:la|el|los|las|mi|mis) /, "");
+    const route = ROUTES.find(item => item.pattern.test(destination) || item.pattern.test(go[1]));
+    if (route) return { kind: "navigate", path: route.path, label: route.label };
+  }
   return null;
 }

@@ -7,6 +7,7 @@ import {
   CircleHelp,
   ClipboardCheck,
   Flame,
+  Globe2,
   House,
   LogOut,
   Menu,
@@ -19,8 +20,8 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import {
@@ -40,6 +41,7 @@ const tabs = [
   { id: "modulos", label: "Módulos", icon: BookOpen },
   { id: "retos", label: "Retos", icon: Target },
   { id: "tutor", label: "Tutor IA", icon: CircleHelp },
+  { id: "consultas", label: "Consultas", icon: Globe2 },
   { id: "postest", label: "Evaluación final", icon: ClipboardCheck },
   { id: "resultados", label: "Resultados", icon: BarChart3 },
   { id: "perfil", label: "Mi ficha", icon: UserRound },
@@ -77,6 +79,7 @@ function NavButton({
   return (
     <button
       onClick={onClick}
+      aria-current={active ? "page" : undefined}
       className={`focus-ring flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold transition ${active ? "bg-[#e4e8ff] text-[#26356b]" : "text-[#749093] hover:bg-[#f0f8f7] hover:text-[#26356b]"}`}
     >
       <Icon size={18} />
@@ -94,6 +97,11 @@ export default function StudentDashboard() {
       ? (requested as Tab)
       : "inicio";
   });
+  const search = useSearch();
+  useEffect(() => {
+    const requested = new URLSearchParams(search).get("tab");
+    if (tabs.some(tab => tab.id === requested)) setActive(requested as Tab);
+  }, [search]);
   const [mobileNav, setMobileNav] = useState(false);
   const [localProgress, setLocalProgress] = useState(() => getProgress());
   const [localChallenges, setLocalChallenges] = useState(() => getChallenges());
@@ -206,6 +214,13 @@ export default function StudentDashboard() {
         description="Escribe tu propio intento y recibe retroalimentación guiada."
         href="/tutor"
         label="Abrir tutor"
+      />
+    ) : active === "consultas" ? (
+      <LinkedFeature
+        title="Área de consultas"
+        description="Busca en internet temas relacionados con la capacitación, con fuentes que puedes verificar."
+        href="/consultas"
+        label="Abrir consultas"
       />
     ) : active === "postest" ? (
       <LinkedFeature

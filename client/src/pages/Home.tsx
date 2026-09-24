@@ -34,7 +34,7 @@ export default function Home() {
     mode: "learning",
     route: "/",
     currentContent:
-      "Página de bienvenida de Aula IA científica. Puedes comenzar la capacitación, ver cómo funciona, revisar los principios o entrar al panel docente.",
+      "Página de bienvenida de Aula IA científica. Puedes comenzar la capacitación, ver cómo funciona, revisar los principios, abrir el Área de consultas o entrar al panel docente.",
   });
   return (
     <div className="min-h-screen mesh-bg grid-paper">
@@ -60,6 +60,9 @@ export default function Home() {
           <a href="#principios" className="transition hover:text-[#26356b]">
             Principios
           </a>
+          <Link href="/consultas" className="transition hover:text-[#26356b]">
+            Consultas
+          </Link>
           <Link href="/docente" className="transition hover:text-[#26356b]">
             Panel docente
           </Link>

@@ -49,10 +49,12 @@ export function isTeacherRequest(
   const cookies = parse(req.headers.cookie || "");
   return isTeacherTokenValid(cookies[TEACHER_COOKIE]);
 }
+// En desarrollo la app corre en http://, donde una cookie "secure" nunca se guarda.
+const isProduction = process.env.NODE_ENV === "production";
 export const teacherCookieOptions = {
   httpOnly: true,
-  secure: true,
-  sameSite: "none" as const,
+  secure: isProduction,
+  sameSite: isProduction ? ("none" as const) : ("lax" as const),
   path: "/",
   maxAge,
 };

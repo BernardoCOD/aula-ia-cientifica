@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "aula-ia",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "node_modules/cross-env/dist/bin/cross-env.js",
+        "NODE_ENV=development",
+        "node",
+        "node_modules/tsx/dist/cli.mjs",
+        "server/_core/index.ts"
+      ],
+      "port": 3000
+    }
+  ]
+}

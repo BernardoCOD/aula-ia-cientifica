@@ -1,3 +1,5 @@
+import { courseModules } from "@shared/course";
+
 export type StudentSession = {
   code: string;
   grade: string;
@@ -67,58 +69,17 @@ export function addChallenge(item: { name: string; score: number }) {
   items.push(item);
   localStorage.setItem(CHALLENGE_KEY, JSON.stringify(items));
 }
-export const modules = [
-  {
-    id: "m1",
-    number: "01",
-    title: "IA para comprender",
-    short: "Reconoce la IA como apoyo para entender contenidos de clase.",
-    color: "bg-[#e4e8ff]",
-    icon: "✦",
-  },
-  {
-    id: "m2",
-    number: "02",
-    title: "Instrucciones que ayudan",
-    short:
-      "Formula prompts claros para aprender, practicar y recibir orientación.",
-    color: "bg-[#ffe7d6]",
-    icon: "◎",
-  },
-  {
-    id: "m3",
-    number: "03",
-    title: "Pensar con apoyo de IA",
-    short: "Resuelve problemas sin entregar tu razonamiento a la herramienta.",
-    color: "bg-[#e7ddff]",
-    icon: "⌁",
-  },
-  {
-    id: "m4",
-    number: "04",
-    title: "Verificar antes de usar",
-    short: "Contrasta respuestas, fuentes, fechas y evidencias.",
-    color: "bg-[#fff0c7]",
-    icon: "⌕",
-  },
-  {
-    id: "m5",
-    number: "05",
-    title: "Investigar y organizar",
-    short:
-      "Usa la IA para ordenar preguntas e información sin reemplazar tus fuentes.",
-    color: "bg-[#dceaff]",
-    icon: "↗",
-  },
-  {
-    id: "m6",
-    number: "06",
-    title: "Comunicar con criterio",
-    short:
-      "Elabora respuestas propias, éticas y fundamentadas para tus clases.",
-    color: "bg-[#e3f4d8]",
-    icon: "◌",
-  },
-];
+const moduleLook: Record<string, { color: string; icon: string }> = {
+  m1: { color: "bg-[#e4e8ff]", icon: "✦" },
+  m2: { color: "bg-[#ffe7d6]", icon: "◎" },
+  m3: { color: "bg-[#e7ddff]", icon: "⌁" },
+  m4: { color: "bg-[#fff0c7]", icon: "⌕" },
+  m5: { color: "bg-[#dceaff]", icon: "↗" },
+  m6: { color: "bg-[#e3f4d8]", icon: "◌" },
+};
+export const modules = courseModules.map(module => ({
+  ...module,
+  ...moduleLook[module.id],
+}));
 export const moduleById = (id: string) =>
   modules.find(module => module.id === id) ?? modules[0];

@@ -9,6 +9,7 @@ import {
 } from "./_core/trpc";
 import {
   deleteStudentByCode,
+  getRecentConsultations,
   getAdminStats,
   getAdminStudents,
   getStudentDashboard,
@@ -19,7 +20,14 @@ import {
   upsertStudent,
 } from "./db";
 import { z } from "zod";
-import { invokeLLM } from "./_core/llm";
+import Anthropic from "@anthropic-ai/sdk";
+import {
+  askClaudeJson,
+  ClaudeNotConfiguredError,
+  isClaudeConfigured,
+} from "./_core/claude";
+import { agentInputSchema, runAgentTurn } from "./assistantAgent";
+import { answerConsulta, consultaInputSchema } from "./consultas";
 import {
   enablePostest,
   getEligibility,
@@ -37,87 +45,37 @@ import {
 } from "./adminAuth";
 import { TRPCError } from "@trpc/server";
 
-const VOICE_INTENTS = [
-  "NAVIGATE_HOME",
-  "NAVIGATE_MODULE",
-  "NAVIGATE_PRETEST",
-  "NAVIGATE_POSTEST",
-  "NAVIGATE_TUTOR",
-  "NAVIGATE_IDENTIFICATION",
-  "NAVIGATE_TEACHER",
-  "OPEN_MENU",
-  "OPEN_RESULTS",
-  "NEXT_CONTENT",
-  "PREVIOUS_CONTENT",
-  "GO_TO_QUESTION",
-  "REPEAT_CONTENT",
-  "READ_SCREEN",
-  "READ_SCREEN_FULL",
-  "READ_CONTENT",
-  "EXPLAIN_CONTENT",
-  "SIMPLIFY_EXPLANATION",
-  "START_ACTIVITY",
-  "SELECT_OPTION",
-  "WRITE_TEXT",
-  "FILL_FORM",
-  "LIST_CONTROLS",
-  "ACTIVATE_CONTROL",
-  "ACTIVATE_ASSISTANT",
-  "STOP_ASSISTANT",
-  "FOCUS_NEXT",
-  "FOCUS_PREVIOUS",
-  "ACTIVATE_FOCUSED",
-  "TEXT_SCALE_UP",
-  "TEXT_SCALE_DOWN",
-  "PAUSE",
-  "RESUME",
-  "GO_BACK",
-  "HELP",
-  "CURRENT_MODULE",
-  "CURRENT_CONTENT",
-  "LIST_MODULES",
-  "START_LEARNING",
-  "CONFIRM_LOGOUT",
-  "TOGGLE_SIMULATION",
-  "DECLINE",
-  "UNKNOWN",
-] as const;
-
-const intentInputSchema = z.object({
-  text: z.string().trim().min(1).max(500),
-  mode: z.enum(["learning", "evaluation"]),
-  context: z
-    .object({
-      route: z.string().max(120).optional(),
-      moduleId: z.string().max(32).optional(),
-      moduleTitle: z.string().max(160).optional(),
-      currentContent: z.string().max(2000).optional(),
-      currentQuestion: z.string().max(1000).optional(),
-      currentOptions: z.array(z.string().max(400)).max(4).optional(),
-      questionIndex: z.number().int().min(0).max(9).optional(),
-      totalQuestions: z.number().int().min(0).max(10).optional(),
-    })
-    .optional(),
-});
-
-const LEARNING_ASSISTANT_RULES =
-  'Eres la capa de interpretación de intención de un asistente educativo y de accesibilidad por voz para Aula IA. Devuelve solo una intención de la lista cerrada, un mensaje breve en español natural y apto para síntesis, y un valor confidence entre 0 y 1 con tu certeza real sobre la interpretación (usa valores bajos, menores a 0.5, cuando la orden sea ambigua, incompleta o pueda confundirse con otro control o pantalla). Conoce todas las rutas: inicio, identificación, diagnóstico/pretest, dashboard o mi ruta, módulos, Tutor IA, postest y panel docente. Comprende abrir Tutor IA, tutor inteligente, retroalimentación, identificarme, panel docente, qué módulos hay, leer pantalla, lee todo (lectura detallada y completa, usa READ_SCREEN_FULL), activar texto a voz, dónde estoy, qué puedo hacer, continuar, siguiente pregunta, pregunta anterior, responder pregunta dos, ir a la pregunta tres, foco siguiente, activar control, aumentar o disminuir letra, abrir menú, ver resultados, volver al inicio, comenzar capacitación y modo simulación (usa TOGGLE_SIMULATION). Usa GO_TO_QUESTION con questionIndex basado en cero para una pregunta concreta. También interpreta "escribe" o "dicta" para WRITE_TEXT usando el campo enfocado, "completa estudiante ... colegio ..." para FILL_FORM usando solo campos no sensibles, "qué botones hay" para LIST_CONTROLS y "presiona continuar" o un nombre visible para ACTIVATE_CONTROL. Interpreta activar asistente, hablar con IA u oye Aula IA como ACTIVATE_ASSISTANT, y detener asistente o silenciar asistente como STOP_ASSISTANT. Usa el contexto de ruta y pantalla; no ejecutes acciones directamente. Ayuda a comprender, pero no hagas tareas para copiar. Nunca repitas, almacenes ni envíes contraseñas o datos sensibles; si aparecen, usa DECLINE. Si la intención es ambigua usa UNKNOWN con confidence bajo.';
-
-const EVALUATION_ASSISTANT_RULES =
-  "Eres un asistente educativo y de accesibilidad por voz en MODO EVALUACIÓN. Solo puedes leer la pregunta y alternativas (incluida una lectura detallada con READ_SCREEN_FULL si piden 'lee todo'), repetir, informar progreso, seleccionar la opción que el estudiante diga, avanzar, regresar, leer instrucciones y ajustar accesibilidad, incluyendo activar o desactivar el modo simulación. Nunca resuelvas, sugieras, expliques, insinúes ni des pistas. Usa DECLINE para cualquier solicitud de respuesta o explicación. No repitas ni proceses contraseñas ni datos sensibles. Devuelve siempre un confidence entre 0 y 1.";
-
-// Intenciones que jamás deben ejecutar contenido explicativo durante una evaluación,
-// sin importar lo que haya decidido el modelo. Segunda barrera de seguridad, además del prompt.
-const EVALUATION_FORBIDDEN_INTENTS = new Set([
-  "EXPLAIN_CONTENT",
-  "SIMPLIFY_EXPLANATION",
-  "START_ACTIVITY",
-  "START_LEARNING",
-  "WRITE_TEXT",
-  "FILL_FORM",
-]);
-const EVALUATION_SAFE_DECLINE_MESSAGE =
-  "Durante la evaluación no puedo explicar ni sugerir alternativas, para no afectar tu resultado. Puedo leer la pregunta, repetir o avanzar cuando quieras.";
+/** Convierte los errores de la API de Claude en mensajes comprensibles que el asistente puede leer. */
+async function withClaude<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof TRPCError) throw error;
+    console.error(
+      "[Claude]",
+      error instanceof ClaudeNotConfiguredError ? error.message : error
+    );
+    const message =
+      error instanceof ClaudeNotConfiguredError
+        ? "La inteligencia artificial no está configurada: falta la clave ANTHROPIC_API_KEY en el archivo .env del servidor."
+        : error instanceof Anthropic.AuthenticationError
+          ? "La clave de Claude no es válida. Revisa ANTHROPIC_API_KEY en el archivo .env."
+          : error instanceof Anthropic.RateLimitError
+            ? "El servicio de IA está recibiendo demasiadas solicitudes. Espera unos segundos e inténtalo otra vez."
+            : error instanceof Anthropic.APIConnectionError
+              ? "No hay conexión con el servicio de IA. Revisa la conexión a internet."
+              : error instanceof Anthropic.APIError
+                ? "El servicio de IA tuvo un problema. Inténtalo otra vez en un momento."
+                : "No pude completar la solicitud. Inténtalo otra vez.";
+    throw new TRPCError({
+      code:
+        error instanceof ClaudeNotConfiguredError
+          ? "PRECONDITION_FAILED"
+          : "INTERNAL_SERVER_ERROR",
+      message,
+    });
+  }
+}
 
 const studentCode = z
   .string()
@@ -255,48 +213,39 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
-        const response = await invokeLLM({
-          messages: [
-            {
-              role: "system",
-              content:
-                "Eres un tutor educativo para estudiantes de secundaria. Analiza la respuesta del estudiante sin hacerle la tarea. Devuelve JSON con result (correcta, parcial o incorrecta), score (0 a 100), feedback (2 a 4 frases claras), nextQuestion (una pregunta breve de seguimiento). Promueve verificar fuentes y elaborar respuestas propias.",
-            },
-            {
-              role: "user",
-              content: `Módulo: ${input.moduleId}\nActividad: ${input.activity}\nPregunta: ${input.question}\nRespuesta del estudiante: ${input.response}`,
-            },
-          ],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "tutor_feedback",
-              strict: true,
-              schema: {
-                type: "object",
-                properties: {
-                  result: {
-                    type: "string",
-                    enum: ["correcta", "parcial", "incorrecta"],
-                  },
-                  score: { type: "integer", minimum: 0, maximum: 100 },
-                  feedback: { type: "string" },
-                  nextQuestion: { type: "string" },
-                },
-                required: ["result", "score", "feedback", "nextQuestion"],
-                additionalProperties: false,
+        const feedback = await withClaude(() =>
+          askClaudeJson<{
+            result: string;
+            score: number;
+            feedback: string;
+            nextQuestion: string;
+          }>({
+            system:
+              "Eres un tutor educativo para estudiantes de secundaria. Analiza la respuesta del estudiante sin hacerle la tarea. Devuelve result (correcta, parcial o incorrecta), score (entero de 0 a 100), feedback (2 a 4 frases claras, sin markdown, porque se leen en voz alta) y nextQuestion (una pregunta breve de seguimiento). Promueve verificar fuentes y elaborar respuestas propias.",
+            messages: [
+              {
+                role: "user",
+                content: `Módulo: ${input.moduleId}\nActividad: ${input.activity}\nPregunta: ${input.question}\nRespuesta del estudiante: ${input.response}`,
               },
+            ],
+            schema: {
+              type: "object",
+              properties: {
+                result: {
+                  type: "string",
+                  enum: ["correcta", "parcial", "incorrecta"],
+                },
+                score: { type: "integer" },
+                feedback: { type: "string" },
+                nextQuestion: { type: "string" },
+              },
+              required: ["result", "score", "feedback", "nextQuestion"],
+              additionalProperties: false,
             },
-          },
-        });
-        const raw = response.choices?.[0]?.message?.content;
-        const text = typeof raw === "string" ? raw : "{}";
-        const feedback = JSON.parse(text) as {
-          result: string;
-          score: number;
-          feedback: string;
-          nextQuestion: string;
-        };
+            effort: "medium",
+          })
+        );
+        feedback.score = Math.max(0, Math.min(100, Math.round(feedback.score)));
         await saveAiInteraction({
           ...input,
           result: feedback.result,
@@ -313,149 +262,17 @@ export const appRouter = router({
       }),
   }),
   assistant: router({
-    interpretIntent: publicProcedure
-      .input(intentInputSchema)
-      .mutation(async ({ input }) => {
-        const context = input.context;
-        const contextLines = [
-          context?.route ? `Ruta actual: ${context.route}` : null,
-          context?.moduleId
-            ? `Módulo actual: ${context.moduleId}${context.moduleTitle ? ` (${context.moduleTitle})` : ""}`
-            : null,
-          context?.currentContent
-            ? `Contenido visible en pantalla: ${context.currentContent}`
-            : null,
-          context?.currentQuestion
-            ? `Pregunta actual: ${context.currentQuestion}`
-            : null,
-          context?.currentOptions?.length
-            ? `Alternativas: ${context.currentOptions.map((option, index) => `${String.fromCharCode(65 + index)}) ${option}`).join(" | ")}`
-            : null,
-          typeof context?.questionIndex === "number" &&
-          typeof context?.totalQuestions === "number"
-            ? `Progreso: pregunta ${context.questionIndex + 1} de ${context.totalQuestions}`
-            : null,
-        ]
-          .filter(Boolean)
-          .join("\n");
-
-        const systemPrompt =
-          input.mode === "evaluation"
-            ? EVALUATION_ASSISTANT_RULES
-            : LEARNING_ASSISTANT_RULES;
-
-        const response = await invokeLLM({
-          messages: [
-            { role: "system", content: systemPrompt },
-            {
-              role: "user",
-              content: `Contexto actual:\n${contextLines || "Sin contexto adicional."}\n\nMensaje del estudiante: "${input.text}"`,
-            },
-          ],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "voice_intent",
-              strict: true,
-              schema: {
-                type: "object",
-                properties: {
-                  intent: { type: "string", enum: [...VOICE_INTENTS] },
-                  moduleNumber: { type: "integer" },
-                  optionLetter: {
-                    type: "string",
-                    enum: ["A", "B", "C", "D", ""],
-                  },
-                  message: { type: "string" },
-                  value: { type: "string" },
-                  controlTarget: { type: "string" },
-                  fields: {
-                    type: "object",
-                    properties: {
-                      student: { type: "string" },
-                      school: { type: "string" },
-                    },
-                    additionalProperties: false,
-                  },
-                  confidence: { type: "number", minimum: 0, maximum: 1 },
-                },
-                required: ["intent", "moduleNumber", "optionLetter", "message"],
-                additionalProperties: false,
-              },
-            },
-          },
-        }).catch(() => null);
-
-        if (!response) {
-          return {
-            intent: "UNKNOWN" as const,
-            moduleNumber: 0,
-            optionLetter: "",
-            message:
-              "En este momento no puedo interpretar tu voz. Puedes continuar usando la navegación normal de la pantalla.",
-            confidence: 0,
-          };
-        }
-
-        const raw = response.choices?.[0]?.message?.content;
-        const text = typeof raw === "string" ? raw : "{}";
-        let parsed: {
-          intent: string;
-          moduleNumber: number;
-          optionLetter: string;
-          message: string;
-          confidence?: number;
-        };
-        try {
-          parsed = JSON.parse(text);
-        } catch {
-          parsed = {
-            intent: "UNKNOWN",
-            moduleNumber: 0,
-            optionLetter: "",
-            message:
-              "No logré entenderte. Puedes decir: 'abrir módulo dos' o 'repetir'.",
-            confidence: 0,
-          };
-        }
-
-        // Segunda barrera de seguridad: en modo evaluación, ninguna intención explicativa puede pasar,
-        // sin importar lo que haya devuelto el modelo.
-        if (
-          input.mode === "evaluation" &&
-          EVALUATION_FORBIDDEN_INTENTS.has(parsed.intent)
-        ) {
-          return {
-            intent: "DECLINE" as const,
-            moduleNumber: 0,
-            optionLetter: "",
-            message: EVALUATION_SAFE_DECLINE_MESSAGE,
-            confidence: 1,
-          };
-        }
-
-        if (
-          !VOICE_INTENTS.includes(
-            parsed.intent as (typeof VOICE_INTENTS)[number]
-          )
-        ) {
-          return {
-            intent: "UNKNOWN" as const,
-            moduleNumber: 0,
-            optionLetter: "",
-            message:
-              parsed.message ||
-              "No logré entenderte. Puedes decir: 'abrir módulo dos' o 'repetir'.",
-            confidence: parsed.confidence ?? 0.3,
-          };
-        }
-
-        return {
-          ...parsed,
-          confidence:
-            typeof parsed.confidence === "number" ? parsed.confidence : 0.7,
-        };
-      }),
+    /** Indica al navegador si la IA está configurada, para avisarlo por voz desde el inicio. */
+    status: publicProcedure.query(() => ({ aiReady: isClaudeConfigured() })),
+    /** Un turno del agente: recibe la orden y la fotografía de la pantalla, devuelve voz y acciones. */
+    act: publicProcedure
+      .input(agentInputSchema)
+      .mutation(({ input }) => withClaude(() => runAgentTurn(input))),
+  }),
+  consultas: router({
+    ask: publicProcedure
+      .input(consultaInputSchema)
+      .mutation(({ input }) => withClaude(() => answerConsulta(input))),
   }),
   admin: router({
     login: publicProcedure
@@ -512,50 +329,41 @@ export const appRouter = router({
           score: z.number().int().min(0).max(100).optional(),
         })
       )
-      .mutation(async ({ input }) => {
-        const answer = await invokeLLM({
-          messages: [
-            {
-              role: "system",
-              content:
-                "Eres asesor pedagógico para docentes de secundaria. Analiza una respuesta estudiantil con enfoque formativo. Devuelve JSON con nivel (fortaleza, en desarrollo o requiere apoyo), hallazgo (una frase), recomendacion (una acción concreta para el docente) y pregunta (una pregunta de seguimiento). No inventes datos ni califiques de forma punitiva.",
-            },
-            {
-              role: "user",
-              content: `Pregunta: ${input.question}\nRespuesta: ${input.response}\nResultado automático: ${input.result ?? "no disponible"}\nPuntaje automático: ${input.score ?? "no disponible"}`,
-            },
-          ],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "teacher_response_analysis",
-              strict: true,
-              schema: {
-                type: "object",
-                properties: {
-                  nivel: {
-                    type: "string",
-                    enum: ["fortaleza", "en desarrollo", "requiere apoyo"],
-                  },
-                  hallazgo: { type: "string" },
-                  recomendacion: { type: "string" },
-                  pregunta: { type: "string" },
-                },
-                required: ["nivel", "hallazgo", "recomendacion", "pregunta"],
-                additionalProperties: false,
+      .mutation(({ input }) =>
+        withClaude(() =>
+          askClaudeJson<{
+            nivel: string;
+            hallazgo: string;
+            recomendacion: string;
+            pregunta: string;
+          }>({
+            system:
+              "Eres asesor pedagógico para docentes de secundaria. Analiza una respuesta estudiantil con enfoque formativo. Devuelve nivel (fortaleza, en desarrollo o requiere apoyo), hallazgo (una frase), recomendacion (una acción concreta para el docente) y pregunta (una pregunta de seguimiento). No inventes datos ni califiques de forma punitiva.",
+            messages: [
+              {
+                role: "user",
+                content: `Pregunta: ${input.question}\nRespuesta: ${input.response}\nResultado automático: ${input.result ?? "no disponible"}\nPuntaje automático: ${input.score ?? "no disponible"}`,
               },
+            ],
+            schema: {
+              type: "object",
+              properties: {
+                nivel: {
+                  type: "string",
+                  enum: ["fortaleza", "en desarrollo", "requiere apoyo"],
+                },
+                hallazgo: { type: "string" },
+                recomendacion: { type: "string" },
+                pregunta: { type: "string" },
+              },
+              required: ["nivel", "hallazgo", "recomendacion", "pregunta"],
+              additionalProperties: false,
             },
-          },
-        });
-        const raw = answer.choices?.[0]?.message?.content;
-        const text = typeof raw === "string" ? raw : "{}";
-        return JSON.parse(text) as {
-          nivel: string;
-          hallazgo: string;
-          recomendacion: string;
-          pregunta: string;
-        };
-      }),
+            effort: "medium",
+          })
+        )
+      ),
+    consultations: teacherProcedure.query(() => getRecentConsultations()),
   }),
 });
 

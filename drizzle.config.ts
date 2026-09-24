@@ -1,15 +1,14 @@
 import { defineConfig } from "drizzle-kit";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error("DATABASE_URL is required to run drizzle commands");
-}
-
+// Solo se usa para inspeccionar la base local con "pnpm db:studio"; las tablas se crean
+// automáticamente al iniciar el servidor (server/db.ts).
 export default defineConfig({
   schema: "./drizzle/schema.ts",
   out: "./drizzle",
-  dialect: "mysql",
+  dialect: "sqlite",
   dbCredentials: {
-    url: connectionString,
+    url: process.env.DATABASE_URL?.startsWith("file:")
+      ? process.env.DATABASE_URL
+      : "file:./data/aula.db",
   },
 });

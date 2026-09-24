@@ -20,6 +20,8 @@ type AssistantContextValue = {
     context: AssistantScreenContext,
     handlers?: AssistantHandlers
   ) => void;
+  /** Lo registra el asistente de voz: permite que una página lea un texto en voz alta. */
+  speakRef: MutableRefObject<(text: string) => void>;
 };
 
 const defaultContext: AssistantScreenContext = { mode: "learning" };
@@ -30,6 +32,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const [screenContext, setScreenContext] =
     useState<AssistantScreenContext>(defaultContext);
   const handlersRef = useRef<AssistantHandlers>({});
+  const speakRef = useRef<(text: string) => void>(() => undefined);
 
   const publishScreen = useCallback(
     (context: AssistantScreenContext, handlers?: AssistantHandlers) => {
@@ -41,7 +44,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   return (
     <AssistantContext.Provider
-      value={{ screenContext, handlersRef, publishScreen }}
+      value={{ screenContext, handlersRef, publishScreen, speakRef }}
     >
       {children}
     </AssistantContext.Provider>
@@ -61,14 +64,15 @@ export function useAssistantContext() {
  * Hook que usa cada página para declarar al asistente de voz qué hay en pantalla:
  * modo (aprendizaje o evaluación), módulo actual, contenido a leer, pregunta/alternativas
  * vigentes, y manejadores opcionales para "siguiente", "anterior" o "seleccionar opción".
- * Se limpia automáticamente al desmontar la pantalla.
+ * Los manejadores se actualizan en cada render para no quedar con datos viejos.
  */
 export function useAssistantScreen(
   context: AssistantScreenContext,
   handlers?: AssistantHandlers
 ) {
-  const { publishScreen } = useAssistantContext();
+  const { publishScreen, handlersRef } = useAssistantContext();
   const contextKey = JSON.stringify(context);
+  handlersRef.current = handlers ?? {};
   useEffect(() => {
     publishScreen(context, handlers);
     return () => publishScreen(defaultContext, {});

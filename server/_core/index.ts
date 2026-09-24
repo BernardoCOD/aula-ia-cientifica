@@ -8,6 +8,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { isClaudeConfigured } from "./claude";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -59,7 +60,11 @@ async function startServer() {
   }
 
   server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+    console.log(`Aula IA lista en http://localhost:${port}/`);
+    if (!isClaudeConfigured())
+      console.warn(
+        "[IA] Falta ANTHROPIC_API_KEY en el archivo .env: el asistente solo entenderá órdenes directas."
+      );
   });
 }
 

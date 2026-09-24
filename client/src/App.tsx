@@ -13,6 +13,7 @@ import ModulePage from "./pages/ModulePage";
 import Admin from "./pages/Admin";
 import TutorPage from "./pages/TutorPage";
 import Postest from "./pages/Postest";
+import ConsultasPage from "./pages/ConsultasPage";
 import NotFound from "./pages/NotFound";
 
 function Router() {
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/modulo/:id" component={ModulePage} />
       <Route path="/tutor" component={TutorPage} />
       <Route path="/postest" component={Postest} />
+      <Route path="/consultas" component={ConsultasPage} />
       <Route path="/docente" component={Admin} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
