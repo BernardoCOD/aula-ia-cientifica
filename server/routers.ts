@@ -21,11 +21,13 @@ import {
 } from "./db";
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
+import { ApiError as GeminiApiError } from "@google/genai";
 import {
-  askClaudeJson,
-  ClaudeNotConfiguredError,
-  isClaudeConfigured,
-} from "./_core/claude";
+  AiNotConfiguredError,
+  aiProvider,
+  askJson,
+} from "./_core/ai";
+import { ClaudeNotConfiguredError } from "./_core/claude";
 import { agentInputSchema, runAgentTurn } from "./assistantAgent";
 import { answerConsulta, consultaInputSchema } from "./consultas";
 import {
@@ -45,34 +47,39 @@ import {
 } from "./adminAuth";
 import { TRPCError } from "@trpc/server";
 
-/** Convierte los errores de la API de Claude en mensajes comprensibles que el asistente puede leer. */
-async function withClaude<T>(run: () => Promise<T>): Promise<T> {
+/** Convierte los errores del servicio de IA en mensajes comprensibles que el asistente puede leer. */
+function aiErrorMessage(error: unknown) {
+  if (error instanceof AiNotConfiguredError || error instanceof ClaudeNotConfiguredError)
+    return "La inteligencia artificial no está configurada: falta la clave GEMINI_API_KEY en el archivo .env del servidor.";
+  if (error instanceof GeminiApiError) {
+    if (error.status === 429)
+      return "Se agotó por ahora el uso gratuito de la IA. Espera un minuto e inténtalo otra vez; si pasa seguido, es el límite diario y se renueva mañana.";
+    if (error.status === 400 || error.status === 401 || error.status === 403)
+      return "La clave de Gemini no es válida o no tiene permiso. Revisa GEMINI_API_KEY en el archivo .env.";
+    return "El servicio de IA tuvo un problema. Inténtalo otra vez en un momento.";
+  }
+  if (error instanceof Anthropic.AuthenticationError)
+    return "La clave de Claude no es válida. Revisa ANTHROPIC_API_KEY en el archivo .env.";
+  if (error instanceof Anthropic.RateLimitError)
+    return "El servicio de IA está recibiendo demasiadas solicitudes. Espera unos segundos e inténtalo otra vez.";
+  if (error instanceof Anthropic.APIConnectionError || (error instanceof TypeError && /fetch/i.test(error.message)))
+    return "No hay conexión con el servicio de IA. Revisa la conexión a internet.";
+  if (error instanceof Anthropic.APIError)
+    return "El servicio de IA tuvo un problema. Inténtalo otra vez en un momento.";
+  return "No pude completar la solicitud. Inténtalo otra vez.";
+}
+
+async function withAi<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run();
   } catch (error) {
     if (error instanceof TRPCError) throw error;
-    console.error(
-      "[Claude]",
-      error instanceof ClaudeNotConfiguredError ? error.message : error
-    );
-    const message =
-      error instanceof ClaudeNotConfiguredError
-        ? "La inteligencia artificial no está configurada: falta la clave ANTHROPIC_API_KEY en el archivo .env del servidor."
-        : error instanceof Anthropic.AuthenticationError
-          ? "La clave de Claude no es válida. Revisa ANTHROPIC_API_KEY en el archivo .env."
-          : error instanceof Anthropic.RateLimitError
-            ? "El servicio de IA está recibiendo demasiadas solicitudes. Espera unos segundos e inténtalo otra vez."
-            : error instanceof Anthropic.APIConnectionError
-              ? "No hay conexión con el servicio de IA. Revisa la conexión a internet."
-              : error instanceof Anthropic.APIError
-                ? "El servicio de IA tuvo un problema. Inténtalo otra vez en un momento."
-                : "No pude completar la solicitud. Inténtalo otra vez.";
+    const notConfigured =
+      error instanceof AiNotConfiguredError || error instanceof ClaudeNotConfiguredError;
+    console.error("[IA]", notConfigured ? (error as Error).message : error);
     throw new TRPCError({
-      code:
-        error instanceof ClaudeNotConfiguredError
-          ? "PRECONDITION_FAILED"
-          : "INTERNAL_SERVER_ERROR",
-      message,
+      code: notConfigured ? "PRECONDITION_FAILED" : "INTERNAL_SERVER_ERROR",
+      message: aiErrorMessage(error),
     });
   }
 }
@@ -213,8 +220,8 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
-        const feedback = await withClaude(() =>
-          askClaudeJson<{
+        const feedback = await withAi(() =>
+          askJson<{
             result: string;
             score: number;
             feedback: string;
@@ -263,16 +270,19 @@ export const appRouter = router({
   }),
   assistant: router({
     /** Indica al navegador si la IA está configurada, para avisarlo por voz desde el inicio. */
-    status: publicProcedure.query(() => ({ aiReady: isClaudeConfigured() })),
+    status: publicProcedure.query(() => ({
+      aiReady: aiProvider() !== null,
+      provider: aiProvider(),
+    })),
     /** Un turno del agente: recibe la orden y la fotografía de la pantalla, devuelve voz y acciones. */
     act: publicProcedure
       .input(agentInputSchema)
-      .mutation(({ input }) => withClaude(() => runAgentTurn(input))),
+      .mutation(({ input }) => withAi(() => runAgentTurn(input))),
   }),
   consultas: router({
     ask: publicProcedure
       .input(consultaInputSchema)
-      .mutation(({ input }) => withClaude(() => answerConsulta(input))),
+      .mutation(({ input }) => withAi(() => answerConsulta(input))),
   }),
   admin: router({
     login: publicProcedure
@@ -330,8 +340,8 @@ export const appRouter = router({
         })
       )
       .mutation(({ input }) =>
-        withClaude(() =>
-          askClaudeJson<{
+        withAi(() =>
+          askJson<{
             nivel: string;
             hallazgo: string;
             recomendacion: string;

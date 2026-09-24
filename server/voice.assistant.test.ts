@@ -3,12 +3,12 @@ import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import type { AgentReply } from "@shared/assistant";
 
-// Claude se simula: las pruebas verifican las barreras del servidor, no al modelo.
+// La IA se simula: las pruebas verifican las barreras del servidor, no al modelo.
 const askClaudeJsonMock = vi.hoisted(() => vi.fn());
-vi.mock("./_core/claude", async importOriginal => ({
-  ...(await importOriginal<typeof import("./_core/claude")>()),
-  askClaudeJson: askClaudeJsonMock,
-  isClaudeConfigured: () => true,
+vi.mock("./_core/ai", async importOriginal => ({
+  ...(await importOriginal<typeof import("./_core/ai")>()),
+  askJson: askClaudeJsonMock,
+  aiProvider: () => "gemini",
 }));
 
 function context(): TrpcContext {

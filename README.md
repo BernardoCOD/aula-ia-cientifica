@@ -13,8 +13,10 @@ relacionados con la IA.
 
 - [Node.js](https://nodejs.org) 20 o superior.
 - Google Chrome o Microsoft Edge (el reconocimiento de voz del navegador funciona mejor en ellos).
-- Una clave de la API de Claude: en [console.anthropic.com](https://console.anthropic.com), sección
-  **API Keys**. Sin la clave la app funciona, pero el asistente solo entiende órdenes directas.
+- Una clave **gratuita** de Google Gemini, sin tarjeta de crédito: entra a
+  [aistudio.google.com/apikey](https://aistudio.google.com/apikey) con una cuenta de Google y pulsa
+  **Create API key**. Sin la clave la app funciona, pero el asistente solo entiende órdenes directas.
+  (Opcional: la app también funciona con la IA, que es de pago.)
 
 ## Instalación y uso
 
@@ -23,7 +25,7 @@ npx pnpm@10.4.1 install      # instala dependencias (una sola vez)
 copy .env.example .env       # en Windows; en Mac/Linux: cp .env.example .env
 ```
 
-Abre `.env` y completa al menos `ANTHROPIC_API_KEY`, `ADMIN_PASSWORD` y `JWT_SECRET`. Luego:
+Abre `.env` y completa al menos `GEMINI_API_KEY`, `ADMIN_PASSWORD` y `JWT_SECRET`. Luego:
 
 ```bash
 npx pnpm@10.4.1 dev          # modo desarrollo: http://localhost:3000
@@ -37,7 +39,10 @@ npx pnpm@10.4.1 check        # verificación de tipos
 
 | Variable | Uso |
 |---|---|
-| `ANTHROPIC_API_KEY` | Clave de Claude: asistente inteligente, Área de consultas, Tutor IA y análisis docente. |
+| `GEMINI_API_KEY` | Clave gratuita de Gemini: asistente inteligente, Área de consultas, Tutor IA y análisis docente. |
+| `GEMINI_MODEL` | Opcional. Modelo del asistente (por defecto `gemini-3.8-flash`; si se agota su cupo gratuito se prueban `gemini-3.5-flash-lite` y `gemini-2.5-flash`). |
+| `GEMINI_SEARCH_MODEL` | Opcional. Modelo del Área de consultas (por defecto `gemini-2.5-flash`, el que tiene búsqueda de Google gratuita). |
+| `ANTHROPIC_API_KEY` | Opcional y de pago: usar Claude en lugar de Gemini (con `AI_PROVIDER=claude` si hay dos claves). |
 | `ANTHROPIC_MODEL` | Opcional. Modelo de Claude (por defecto `claude-opus-5`). |
 | `ANTHROPIC_EFFORT` | Opcional. `low` (por defecto, respuestas de voz más rápidas), `medium` o `high`. |
 | `ANTHROPIC_RESEARCH_EFFORT` | Opcional. Esfuerzo del Área de consultas (por defecto `medium`). |
@@ -46,7 +51,13 @@ npx pnpm@10.4.1 check        # verificación de tipos
 | `JWT_SECRET` | Firma de las cookies de sesión (texto largo y aleatorio). |
 | `PORT` | Puerto del servidor (por defecto 3000). |
 
-Las claves nunca llegan al navegador: todas las llamadas a Claude se hacen desde el servidor.
+Las claves nunca llegan al navegador: todas las llamadas a la IA se hacen desde el servidor.
+
+**Plan gratuito de Gemini:** tiene límites por minuto y por día (se ven en AI Studio). Si se
+agotan, el asistente lo avisa y las órdenes directas siguen funcionando. Según las condiciones de
+Google, en el plan gratuito el contenido enviado puede usarse para mejorar sus productos: no se
+envían contraseñas y conviene no dictar datos personales sensibles, e informarlo en el
+consentimiento de la investigación.
 
 ## Base de datos
 
@@ -91,7 +102,7 @@ respuestas. Esto lo garantiza el servidor aunque el modelo se equivoque.
 
 ## Área de consultas (`/consultas`)
 
-Búsqueda en internet con Claude limitada a temas de la capacitación: IA, uso responsable, prompts,
+Búsqueda en internet con la IA limitada a temas de la capacitación: IA, uso responsable, prompts,
 verificación de información, privacidad y tecnologías de accesibilidad. Las preguntas no
 relacionadas se rechazan con amabilidad. Cada respuesta se lee en voz alta, muestra sus fuentes y
 queda registrada en la base de datos.
@@ -100,8 +111,8 @@ queda registrada en la base de datos.
 
 - **Agente con "fotografía" de la pantalla.** En cada orden, el navegador describe la pantalla
   (`client/src/lib/pageSnapshot.ts`): títulos, texto visible, cada control con un id, sus valores y
-  estados, tablas, diálogos y alertas. El servidor (`server/assistantAgent.ts`) envía eso a Claude
-  con los datos del estudiante y el contenido de los módulos (`shared/course.ts`). Claude responde
+  estados, tablas, diálogos y alertas. El servidor (`server/assistantAgent.ts`) envía eso a la IA
+  con los datos del estudiante y el contenido de los módulos (`shared/course.ts`). La IA responde
   con salidas estructuradas: qué decir, qué acciones ejecutar y si necesita confirmación. Así el
   asistente funciona en cualquier pantalla, también en las que se agreguen después, sin programar
   comandos uno por uno.
@@ -110,7 +121,7 @@ queda registrada en la base de datos.
   qué pasó; si algo falla, el asistente lo dice en lugar de dar por hecho que funcionó.
 - **Barreras en el servidor, no solo en el prompt**: se descartan acciones sobre controles o rutas
   inexistentes, y en evaluación se bloquea escribir o marcar alternativas no dictadas.
-- **Doble confirmación**: la pide Claude y, además, el navegador exige confirmar cualquier botón de
+- **Doble confirmación**: la pide la IA y, además, el navegador exige confirmar cualquier botón de
   envío, borrado o salida.
 - **Comandos locales** (`client/src/lib/voiceIntents.ts`): las órdenes más comunes se resuelven al
   instante en el navegador, sin red, y mantienen la app usable si la IA no está disponible.
@@ -122,9 +133,9 @@ queda registrada en la base de datos.
 ## Limitaciones conocidas
 
 - El reconocimiento de voz del navegador necesita internet y funciona mejor en Chrome y Edge.
-- Cada orden al agente tarda unos segundos, porque Claude analiza la pantalla completa.
+- Cada orden al agente tarda unos segundos, porque la IA analiza la pantalla completa.
 - Con el esfuerzo `low` el asistente responde más rápido; si se equivoca en órdenes complejas, prueba
   `ANTHROPIC_EFFORT=medium`.
 - Mientras el asistente habla no escucha (para no oírse a sí mismo): espera a que termine para hablarle.
 - El reconocimiento de voz no funciona en el panel de vista previa del editor: usa Chrome o Edge.
-- El uso de la API de Claude tiene costo por consulta: revisa el consumo en console.anthropic.com.
+- Si se usa Claude (opcional), cada consulta tiene costo; con Gemini gratuito el límite es de uso diario.

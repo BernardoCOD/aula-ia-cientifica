@@ -715,7 +715,7 @@ export function VoiceAssistant() {
           {!aiReady && (
             <p className="mt-2 flex items-start gap-2 rounded-lg border border-[#f0d5c4] bg-[#fff7ed] px-3 py-2 text-xs text-[#8a5a2c]">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-              La IA no está configurada (falta ANTHROPIC_API_KEY en el servidor). Funcionan solo las órdenes directas.
+              La IA no está configurada (falta GEMINI_API_KEY en el archivo .env). Funcionan solo las órdenes directas.
             </p>
           )}
           {speech.transcript && (
@@ -877,7 +877,7 @@ export function VoiceAssistant() {
             />
           </form>
           <p className="mt-2 text-[11px] leading-snug text-[#8a9a9b]">
-            No grabamos audio. Tu orden y el contenido visible de la pantalla se envían al servicio de IA (Claude) solo para responderte; nunca las contraseñas.
+            No grabamos audio. Tu orden y el contenido visible de la pantalla se envían al servicio de IA solo para responderte; nunca las contraseñas.
           </p>
         </section>
       )}

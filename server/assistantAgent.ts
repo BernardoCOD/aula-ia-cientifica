@@ -6,7 +6,7 @@ import {
   type AgentReply,
 } from "@shared/assistant";
 import { courseModules, lessons } from "@shared/course";
-import { askClaudeJson } from "./_core/claude";
+import { askJson } from "./_core/ai";
 import { getStudentDashboard } from "./db";
 import { getEligibility } from "./research";
 
@@ -298,7 +298,7 @@ export async function runAgentTurn(input: AgentInput): Promise<AgentReply> {
   // La API exige que la conversación empiece con un mensaje del usuario.
   while (messages.length > 1 && messages[0].role !== "user") messages.shift();
 
-  const reply = await askClaudeJson<AgentReply>({
+  const reply = await askJson<AgentReply>({
     system: AGENT_SYSTEM_PROMPT,
     messages,
     schema: REPLY_SCHEMA,

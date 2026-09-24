@@ -8,7 +8,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { isClaudeConfigured } from "./claude";
+import { aiProvider } from "./ai";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -61,9 +61,12 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Aula IA lista en http://localhost:${port}/`);
-    if (!isClaudeConfigured())
+    const provider = aiProvider();
+    if (provider)
+      console.log(`[IA] Usando ${provider === "gemini" ? "Google Gemini" : "Claude"}.`);
+    else
       console.warn(
-        "[IA] Falta ANTHROPIC_API_KEY en el archivo .env: el asistente solo entenderá órdenes directas."
+        "[IA] Falta GEMINI_API_KEY en el archivo .env: el asistente solo entenderá órdenes directas."
       );
   });
 }

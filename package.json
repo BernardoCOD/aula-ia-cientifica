@@ -16,6 +16,7 @@
     "@anthropic-ai/sdk": "^0.128.0",
     "@aws-sdk/client-s3": "^3.693.0",
     "@aws-sdk/s3-request-presigner": "^3.693.0",
+    "@google/genai": "^2.24.0",
     "@hookform/resolvers": "^5.2.2",
     "@libsql/client": "^0.18.0",
     "@radix-ui/react-accordion": "^1.2.12",

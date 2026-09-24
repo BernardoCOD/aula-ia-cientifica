@@ -1,6 +1,5 @@
-import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { askClaudeWithWebSearch, textOf } from "./_core/claude";
+import { askWithWebSearch, type ChatMessage } from "./_core/ai";
 import { saveConsultation } from "./db";
 
 export const consultaInputSchema = z.object({
@@ -38,44 +37,22 @@ Si la pregunta es válida:
 - Distingue lo comprobado de lo que es opinión o está en debate, e invita a verificar en las fuentes.
 - No hagas tareas para copiar: explica para que la persona entienda y elabore su propia respuesta.`;
 
-/** Extrae las fuentes citadas y los resultados de búsqueda, sin duplicados. */
-function collectSources(content: Anthropic.Beta.BetaContentBlock[]) {
-  const sources = new Map<string, ConsultaSource>();
-  for (const block of content) {
-    if (block.type === "text")
-      for (const citation of block.citations ?? [])
-        if (citation.type === "web_search_result_location")
-          sources.set(citation.url, {
-            title: citation.title || citation.url,
-            url: citation.url,
-          });
-  }
-  if (sources.size === 0)
-    for (const block of content)
-      if (
-        block.type === "web_search_tool_result" &&
-        Array.isArray(block.content)
-      )
-        for (const result of block.content.slice(0, 5))
-          sources.set(result.url, { title: result.title, url: result.url });
-  return Array.from(sources.values()).slice(0, 8);
-}
-
 export async function answerConsulta(
   input: z.infer<typeof consultaInputSchema>
 ): Promise<ConsultaResult> {
-  const messages: Anthropic.Beta.BetaMessageParam[] = [];
+  const messages: ChatMessage[] = [];
   for (const turn of input.history) {
     messages.push({ role: "user", content: turn.question });
     messages.push({ role: "assistant", content: turn.answer });
   }
   messages.push({ role: "user", content: input.question });
 
-  const response = await askClaudeWithWebSearch({
+  const response = await askWithWebSearch({
     system: CONSULTAS_SYSTEM_PROMPT,
     messages,
   });
-  const raw = textOf(response.content).trim();
+  // Se quitan marcas de formato (asteriscos, almohadillas) porque la respuesta se lee en voz alta.
+  const raw = response.text.replace(/[*#`]+/g, "").trim();
   if (raw.startsWith(OFF_TOPIC_MARKER))
     return {
       related: false,
@@ -85,7 +62,7 @@ export async function answerConsulta(
   const result = {
     related: true,
     answer: raw,
-    sources: collectSources(response.content),
+    sources: response.sources,
   };
   await saveConsultation({
     code: input.studentCode,
