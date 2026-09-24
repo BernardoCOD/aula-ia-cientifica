@@ -214,11 +214,15 @@ export function useSpeech() {
       setError(null);
       setTranscript("");
 
+      let announcedStart = false;
       recognition.onstart = () => {
         setStatus("listening");
-        playTone("on");
+        // En escucha continua el reconocimiento se reinicia seguido: el tono suena solo la primera vez.
+        if (!announcedStart) playTone("on");
+        announcedStart = true;
       };
       recognition.onresult = event => {
+        setError(null);
         let interim = "";
         for (let index = event.resultIndex; index < event.results.length; index++) {
           const result = event.results[index];
@@ -241,7 +245,9 @@ export function useSpeech() {
           );
         } else if (event.error === "network") {
           failure = "error";
-          setError("El reconocimiento de voz necesita conexión a internet.");
+          setError(
+            "No pude conectar con el servicio de reconocimiento de voz. Revisa tu conexión a internet y abre la app en Google Chrome o Microsoft Edge (con el archivo Iniciar Aula IA)."
+          );
         } else if (event.error !== "no-speech" && event.error !== "aborted") {
           failure = "error";
         }
@@ -249,11 +255,20 @@ export function useSpeech() {
       recognition.onend = () => {
         if (recognitionRef.current !== recognition) return;
         // En modo continuo (palabra de activación), Chrome corta cada cierto tiempo: se reanuda.
+        // Tras un error de red se espera unos segundos para no reintentar en bucle.
         if (continuous && failure !== "not-allowed") {
-          try {
-            recognition.start();
-            return;
-          } catch {}
+          const retryDelay = failure === "error" ? 3000 : 0;
+          failure = "no-speech";
+          window.setTimeout(() => {
+            if (recognitionRef.current !== recognition) return;
+            try {
+              recognition.start();
+            } catch {
+              recognitionRef.current = null;
+              setStatus(current => (current === "listening" ? "idle" : current));
+            }
+          }, retryDelay);
+          return;
         }
         recognitionRef.current = null;
         setStatus(current => (current === "listening" ? "idle" : current));

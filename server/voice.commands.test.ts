@@ -82,11 +82,12 @@ describe("local voice commands (sin IA)", () => {
   });
 
   it("recognizes the wake phrase, including common transcriptions of 'Jason'", () => {
-    for (const phrase of ["Oye Jason", "Hey Yeison", "ok jeison", "hola aula"])
+    for (const phrase of ["Oye Jason", "Hey Yeison", "ok jeison", "Okay, Jason.", "OK Jeyson", "hola aula"])
       expect(WAKE_PATTERN.test(normalizeSpeech(phrase))).toBe(true);
     expect(WAKE_PATTERN.exec(normalizeSpeech("Oye Jason, abre el módulo dos"))?.[1]).toBe(
       "abre el modulo dos"
     );
     expect(interpretLocalCommand("Oye Jason")?.kind).toBe("wake");
+    expect(WAKE_PATTERN.test(normalizeSpeech("hoy es jueves"))).toBe(false);
   });
 });

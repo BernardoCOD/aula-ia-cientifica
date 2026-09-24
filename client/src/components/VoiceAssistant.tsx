@@ -111,7 +111,7 @@ export function VoiceAssistant() {
   const [pending, setPendingState] = useState<PendingConfirmation | null>(null);
   const [simulation, setSimulation] = useState(false);
   const [simulationLog, setSimulationLog] = useState<string[]>([]);
-  const [alwaysListen, setAlwaysListen] = useState(() => readStorage(ALWAYS_LISTEN_KEY) === "1");
+  const [alwaysListen, setAlwaysListen] = useState(() => readStorage(ALWAYS_LISTEN_KEY) !== "0");
 
   // Refs: los callbacks de voz se ejecutan fuera del ciclo de React y necesitan el valor actual.
   const modeRef = useRef<ListeningMode>("off");
@@ -159,7 +159,10 @@ export function VoiceAssistant() {
         silenceCountRef.current = 0;
         const command = match[1]?.trim();
         if (command) handleRef.current(command);
-        else respondRef.current("Dime.");
+        else if (!greetedRef.current) {
+          greetedRef.current = true;
+          respondRef.current(`Hola, soy ${ASSISTANT_NAME}. ¿En qué te ayudo?`);
+        } else respondRef.current("Dime.");
       },
     });
   }, [speech, setMode]);
@@ -183,7 +186,7 @@ export function VoiceAssistant() {
           respondRef.current(
             next === "wake"
               ? `Quedo en espera. Di oye ${ASSISTANT_NAME} cuando me necesites.`
-              : "Quedo en espera. Presiona la barra espaciadora cuando me necesites."
+              : "Quedo en espera. Pulsa el botón Hablar con Jason cuando me necesites."
           );
           return;
         }
@@ -316,7 +319,7 @@ export function VoiceAssistant() {
           return void say(
             alwaysListenRef.current
               ? `De acuerdo. Di oye ${ASSISTANT_NAME} cuando me necesites.`
-              : "De acuerdo. Presiona la barra espaciadora cuando me necesites."
+              : "De acuerdo. Pulsa el botón Hablar con Jason cuando me necesites."
           ).then(resumeListening);
         case "pause":
           speech.stopSpeaking();
@@ -585,11 +588,14 @@ export function VoiceAssistant() {
   }, [aiReady, listenForCommand, respond, setMode, speech]);
 
   const stopEverything = useCallback(() => {
-    setMode("off");
     setPending(null);
     speech.stopSpeaking();
     speech.stopListening();
-  }, [setMode, setPending, speech]);
+    if (alwaysListenRef.current && speech.recognitionSupported) {
+      setMode("wake");
+      listenForWakeWord();
+    } else setMode("off");
+  }, [listenForWakeWord, setMode, setPending, speech]);
 
   const toggleAlwaysListen = useCallback(() => {
     const next = !alwaysListenRef.current;
@@ -598,17 +604,17 @@ export function VoiceAssistant() {
     writeStorage(ALWAYS_LISTEN_KEY, next ? "1" : "0");
     if (next && modeRef.current === "off") {
       setMode("wake");
-      void say(`Escucha continua activada. Di oye ${ASSISTANT_NAME} para hablarme.`).then(
+      void say(`Activación por voz encendida. Di oye ${ASSISTANT_NAME} u ok ${ASSISTANT_NAME} para hablarme.`).then(
         listenForWakeWord
       );
     } else if (!next && modeRef.current === "wake") {
       setMode("off");
       speech.stopListening();
-      void say("Escucha continua desactivada.");
+      void say("Activación por voz apagada. Usa el botón Hablar con Jason para hablarme.");
     }
   }, [listenForWakeWord, say, setMode, speech]);
 
-  // Escucha continua guardada: se activa al cargar (útil para quien no puede usar las manos).
+  // Activación por voz: queda atenta a "Oye Jason" desde que carga la página, sin tocar nada.
   useEffect(() => {
     if (alwaysListenRef.current && speech.recognitionSupported) {
       setMode("wake");
@@ -617,23 +623,17 @@ export function VoiceAssistant() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Atajos de teclado: Espacio (sin un control enfocado), Ctrl+Shift+Espacio y Escape.
+  // Atajos opcionales para docentes o acompañantes: Ctrl+Mayús+Espacio y Escape. El uso normal es por voz.
   const startRef = useRef(startConversation);
   startRef.current = startConversation;
   const stopRef = useRef(stopEverything);
   stopRef.current = stopEverything;
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const interactive = target?.closest(
-        "input, textarea, select, button, a, [contenteditable='true'], [role='button'], [role='tab'], [role='checkbox'], [role='radio'], [role='menuitem'], [role='option']"
-      );
-      const plainSpace =
-        event.code === "Space" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey;
       const globalShortcut =
         (event.ctrlKey && event.shiftKey && event.code === "Space") ||
         (event.altKey && event.shiftKey && event.key.toLowerCase() === "v");
-      if (globalShortcut || (plainSpace && !interactive)) {
+      if (globalShortcut) {
         event.preventDefault();
         startRef.current();
       } else if (event.key === "Escape" && modeRef.current !== "off") {
@@ -813,7 +813,7 @@ export function VoiceAssistant() {
               aria-pressed={alwaysListen}
               className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-2 text-xs font-bold ${alwaysListen ? "border-[#5b4bdb] bg-[#f5f1ff] text-[#5b4bdb]" : "border-[#dce9e7] text-[#547074]"}`}
             >
-              <Ear size={14} /> Escucha continua
+              <Ear size={14} /> Activación por voz
             </button>
             <button
               type="button"
@@ -836,8 +836,8 @@ export function VoiceAssistant() {
           </div>
           <p className="mt-2 text-xs text-[#688084]">
             {alwaysListen
-              ? `Escucha continua activa: di "oye ${ASSISTANT_NAME}" en cualquier momento.`
-              : "Presiona Espacio (o Ctrl + Mayús + Espacio) para hablar. Escape detiene."}
+              ? `Di "oye ${ASSISTANT_NAME}" u "ok ${ASSISTANT_NAME}" en cualquier momento, sin tocar nada.`
+              : "La activación por voz está apagada: pulsa Hablar para conversar."}
           </p>
           {showHelp && (
             <p className="mt-2 rounded-lg bg-[#fff7ed] px-3 py-2 text-xs leading-relaxed text-[#8a5a2c]">
@@ -889,7 +889,7 @@ export function VoiceAssistant() {
             ? mode === "conversation"
               ? "Terminar la conversación con el asistente"
               : "Hablar con el asistente"
-            : "Abrir el asistente de voz. También puedes presionar Espacio para hablar"
+            : `Abrir el asistente de voz. También puedes decir oye ${ASSISTANT_NAME}`
         }
         aria-pressed={mode === "conversation"}
         data-ai-action="open-assistant"
@@ -900,7 +900,11 @@ export function VoiceAssistant() {
         ) : (
           <MicOff size={18} />
         )}
-        {mode === "conversation" ? "Escuchando" : `Hablar con ${ASSISTANT_NAME}`}
+        {mode === "conversation"
+          ? "Escuchando"
+          : mode === "wake"
+            ? `Di «Oye ${ASSISTANT_NAME}»`
+            : `Hablar con ${ASSISTANT_NAME}`}
       </button>
     </div>
   );

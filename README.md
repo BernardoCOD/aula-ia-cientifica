@@ -57,14 +57,18 @@ actividades, retos, interacciones con el Tutor IA y consultas. Para verla con un
 
 ## El asistente de voz
 
-**Cómo activarlo**
+**Cómo activarlo: solo con la voz**
 
-- Botón **"Hablar con Jason"** (abajo a la derecha), tecla **Espacio** (cuando no hay un botón o
-  campo enfocado) o **Ctrl + Mayús + Espacio** en cualquier momento. **Escape** lo detiene.
-- **Escucha continua** (botón en el panel): el micrófono queda atento a **"Oye Jason"** en todas las
-  pantallas, incluso al recargar. Pensado para personas que no pueden usar las manos. La primera vez
-  el navegador pide permiso para el micrófono.
-- Tras cada respuesta vuelve a escuchar sin pulsar nada. Después de dos silencios queda en espera.
+- Di **"Oye Jason"** u **"Ok Jason"** en cualquier pantalla, como con el asistente de Google. Puedes
+  decir la orden seguida: "Oye Jason, abre el módulo dos".
+- La activación por voz está encendida desde que se abre la página. Tras cada respuesta vuelve a
+  escuchar sin que digas la frase otra vez; después de dos silencios queda en espera de "Oye Jason".
+- Di **"detener asistente"** para terminar la conversación (seguirá atento a "Oye Jason").
+- Para usarla sin manos, abre la app con **`Iniciar Aula IA.bat`** (doble clic). Inicia el servidor
+  y abre Chrome (o Edge) en una ventana propia, con el micrófono permitido y la voz habilitada sin
+  que nadie toque la página. Los navegadores normales bloquean el audio hasta el primer clic.
+- Atajos opcionales para docentes o acompañantes: botón "Hablar con Jason", **Ctrl + Mayús +
+  Espacio** y **Escape**.
 
 **Qué puede hacer** (habla con naturalidad, no hay frases fijas)
 
@@ -121,5 +125,6 @@ queda registrada en la base de datos.
 - Cada orden al agente tarda unos segundos, porque Claude analiza la pantalla completa.
 - Con el esfuerzo `low` el asistente responde más rápido; si se equivoca en órdenes complejas, prueba
   `ANTHROPIC_EFFORT=medium`.
-- Mientras el asistente habla no escucha: para interrumpirlo usa Espacio, Escape o el botón.
+- Mientras el asistente habla no escucha (para no oírse a sí mismo): espera a que termine para hablarle.
+- El reconocimiento de voz no funciona en el panel de vista previa del editor: usa Chrome o Edge.
 - El uso de la API de Claude tiene costo por consulta: revisa el consumo en console.anthropic.com.

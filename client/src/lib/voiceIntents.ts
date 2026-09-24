@@ -50,7 +50,7 @@ export type LocalCommand =
 export const ASSISTANT_NAME = "Jason";
 
 export const HELP_MESSAGE =
-  "Puedes hablarme con naturalidad. Por ejemplo: abre el módulo dos, qué hay en la pantalla, lee todo, llévame a mis resultados, escribe mi código A12 en el campo del estudiante, cuánto avancé, qué es un prompt, o busca en consultas cómo verificar una noticia. En las evaluaciones di: lee la pregunta, opción B o siguiente pregunta. Para detener la lectura di para. Para que deje de escucharte di detener asistente.";
+  "Puedes hablarme con naturalidad. Por ejemplo: abre el módulo dos, qué hay en la pantalla, lee todo, llévame a mis resultados, escribe mi código A12 en el campo del estudiante, cuánto avancé, qué es un prompt, o busca en consultas cómo verificar una noticia. En las evaluaciones di: lee la pregunta, opción B o siguiente pregunta. Para detener la lectura di para. Cuando termines di detener asistente; seguiré atento y me despiertas diciendo oye Jason u ok Jason.";
 export const AI_UNAVAILABLE_MESSAGE =
   "El asistente inteligente no está disponible en este momento. Puedo seguir ayudándote con órdenes directas como: abre el módulo dos, lee la pantalla, siguiente pregunta o ve al inicio.";
 export const UNSUPPORTED_BROWSER_MESSAGE =
@@ -79,7 +79,7 @@ const NUMBER = "(\\d+|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|p
 
 // Frases de activación. El reconocimiento suele transcribir "Jason" como "yeison" o "jeison".
 export const WAKE_PATTERN =
-  /\b(?:ok|okey|oye|hey|hola|ey)\s+(?:jason|yeison|jeison|jaison|jayson|aula)\b\s*(.*)$/;
+  /\b(?:ok|okey|okay|oka|o k|oye|hey|hei|ei|ey|hola)\s+(?:jason|jasson|yeison|yeyson|jeison|jeyson|jaison|jayson|geison|aula)\b\s*(.*)$/;
 
 const GO = "(?:abre|abrir|ir a|ir al|ve a|ve al|vamos a|vamos al|llevame a|llevame al|quiero ir a|quiero ir al|entra a|entra al|entrar a|entrar al|muestrame|mostrar|pasa a|pasa al|regresa a|regresa al|volver a|volver al|vuelve a|vuelve al)";
 
