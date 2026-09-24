@@ -33,6 +33,10 @@ export default function Diagnostic() {
       currentOptions: questions[voiceIndex]?.options,
       questionIndex: voiceIndex,
       totalQuestions: questions.length,
+      unanswered: questions
+        .map((_, index) => index)
+        .filter(index => answers[index] === undefined)
+        .map(index => index + 1),
     },
     {
       onNext: () =>
@@ -49,10 +53,10 @@ export default function Diagnostic() {
           (target?.querySelector("input") as HTMLElement | null)?.focus();
         }, 0);
       },
-      onSelectOption: letter =>
+      onSelectOption: (letter, index = voiceIndex) =>
         setAnswers(previous => ({
           ...previous,
-          [voiceIndex]: LETTER_TO_INDEX[letter],
+          [index]: LETTER_TO_INDEX[letter],
         })),
     }
   );

@@ -50,7 +50,13 @@ import {
 } from "@/lib/pageActions";
 
 type ListeningMode = "off" | "wake" | "conversation";
-type PendingConfirmation = { question: string; actions: AgentAction[]; speech: string };
+type PendingConfirmation = {
+  question: string;
+  actions: AgentAction[];
+  speech: string;
+  /** Acción local a ejecutar al confirmar (por ejemplo, enviar la evaluación). */
+  run?: () => void;
+};
 type HistoryItem = { you: string; assistant: string };
 
 const TEXT_SIZE_KEY = "aula-ia-text-size";
@@ -278,7 +284,9 @@ export function VoiceAssistant() {
   const readQuestion = useCallback(() => {
     const screen = screenRef.current;
     if (!screen.currentQuestion) return "No hay una pregunta activa en esta pantalla.";
-    return `Pregunta ${(screen.questionIndex ?? 0) + 1} de ${screen.totalQuestions ?? ""}. ${screen.currentQuestion} ${(screen.currentOptions ?? []).map((option, index) => `Opción ${String.fromCharCode(65 + index)}: ${option.replace(/[.\s]+$/, "")}.`).join(" ")}`;
+    const answered = (screen.totalQuestions ?? 0) - (screen.unanswered?.length ?? 0);
+    const progress = screen.unanswered ? ` Llevas ${answered} de ${screen.totalQuestions} respondidas.` : "";
+    return `Pregunta ${(screen.questionIndex ?? 0) + 1} de ${screen.totalQuestions ?? ""}.${progress} ${screen.currentQuestion} ${(screen.currentOptions ?? []).map((option, index) => `Opción ${String.fromCharCode(65 + index)}: ${option.replace(/[.\s]+$/, "")}.`).join(" ")}`;
   }, []);
 
   const stopAssistant = useCallback(() => {
@@ -357,11 +365,49 @@ export function VoiceAssistant() {
         }
         case "decline":
           return respond(command.message);
-        case "select_option":
+        case "select_option": {
           if (!handlers.onSelectOption)
             return respond("No hay una pregunta activa para marcar una alternativa.");
-          handlers.onSelectOption(command.letter);
-          return respond(`Marqué la opción ${command.letter}.`);
+          const screen = screenRef.current;
+          const total = screen.totalQuestions ?? 1;
+          const index = Math.max(0, Math.min(command.index ?? screen.questionIndex ?? 0, total - 1));
+          handlers.onSelectOption(command.letter, index);
+          const marked = `Marqué la opción ${command.letter} en la pregunta ${index + 1}.`;
+          // Como un examen oral: después de marcar, pasa a la siguiente pregunta y la lee.
+          if (index < total - 1) {
+            handlers.onGoToQuestion ? handlers.onGoToQuestion(index + 1) : handlers.onNext?.();
+            window.setTimeout(() => respond(`${marked} ${readQuestion()}`), 200);
+            return;
+          }
+          window.setTimeout(() => {
+            const missing = (screenRef.current.unanswered ?? []).filter(number => number !== index + 1);
+            respond(
+              missing.length
+                ? `${marked} Esa es la última pregunta, pero aún te falta responder ${missing.length === 1 ? "la pregunta" : "las preguntas"} ${missing.join(", ")}. Di, por ejemplo: ir a la pregunta ${missing[0]}.`
+                : `${marked} Respondiste todas las preguntas. Cuando quieras enviar tus respuestas, di: guardar evaluación.`
+            );
+          }, 200);
+          return;
+        }
+        case "submit_evaluation": {
+          const form = document
+            .querySelector("[data-question-index]")
+            ?.closest("form");
+          if (!form) return respond("No encontré una evaluación para enviar en esta pantalla.");
+          const missing = screenRef.current.unanswered ?? [];
+          if (missing.length)
+            return respond(
+              `Todavía no puedes enviarla: te falta responder ${missing.length === 1 ? "la pregunta" : "las preguntas"} ${missing.join(", ")}. Di, por ejemplo: ir a la pregunta ${missing[0]}.`
+            );
+          const question = "¿Confirmas que quieres guardar y enviar tus respuestas? Después ya no podrás cambiarlas.";
+          setPending({
+            question,
+            actions: [],
+            speech: "Listo, envié tus respuestas.",
+            run: () => form.requestSubmit(),
+          });
+          return respond(`${question} Di sí o no.`);
+        }
         case "next_question":
           handlers.onNext?.();
           window.setTimeout(() => respond(readQuestion()), 150);
@@ -524,6 +570,11 @@ export function VoiceAssistant() {
       if (confirmation) {
         if (YES.test(normalized)) {
           setPending(null);
+          if (confirmation.run) {
+            confirmation.run();
+            respond(confirmation.speech);
+            return;
+          }
           rememberTurn("user", text);
           void executeActions(confirmation.actions).then(({ results, failed, readMode }) =>
             finishReply(

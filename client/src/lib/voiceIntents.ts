@@ -15,6 +15,8 @@ export type AssistantScreenContext = {
   currentOptions?: string[];
   questionIndex?: number;
   totalQuestions?: number;
+  /** Números (desde 1) de las preguntas que aún no tienen respuesta. */
+  unanswered?: number[];
 };
 
 export type AssistantHandlers = {
@@ -22,7 +24,8 @@ export type AssistantHandlers = {
   onPrevious?: () => void;
   onGoToQuestion?: (index: number) => void;
   onContinue?: () => void;
-  onSelectOption?: (letter: OptionLetter) => void;
+  /** Marca la alternativa en la pregunta indicada (por defecto, la pregunta activa). */
+  onSelectOption?: (letter: OptionLetter, questionIndex?: number) => void;
   onStartActivity?: () => void;
 };
 
@@ -39,7 +42,8 @@ export type LocalCommand =
   | { kind: "help" }
   | { kind: "simulation" }
   | { kind: "decline"; message: string }
-  | { kind: "select_option"; letter: OptionLetter }
+  | { kind: "select_option"; letter: OptionLetter; index?: number }
+  | { kind: "submit_evaluation" }
   | { kind: "next_question" }
   | { kind: "previous_question" }
   | { kind: "go_to_question"; index: number }
@@ -50,7 +54,7 @@ export type LocalCommand =
 export const ASSISTANT_NAME = "Jason";
 
 export const HELP_MESSAGE =
-  "Puedes hablarme con naturalidad. Por ejemplo: abre el módulo dos, qué hay en la pantalla, lee todo, llévame a mis resultados, escribe mi código A12 en el campo del estudiante, cuánto avancé, qué es un prompt, o busca en consultas cómo verificar una noticia. En las evaluaciones di: lee la pregunta, opción B o siguiente pregunta. Para detener la lectura di para. Cuando termines di detener asistente; seguiré atento y me despiertas diciendo oye Jason u ok Jason.";
+  "Puedes hablarme con naturalidad. Por ejemplo: abre el módulo dos, qué hay en la pantalla, lee todo, llévame a mis resultados, escribe mi código A12 en el campo del estudiante, cuánto avancé, qué es un prompt, o busca en consultas cómo verificar una noticia. En las evaluaciones di: lee la pregunta, opción B (marco y paso a la siguiente), en la pregunta tres marca la C, o guardar evaluación al terminar. Para detener la lectura di para. Cuando termines di detener asistente; seguiré atento y me despiertas diciendo oye Jason u ok Jason.";
 export const AI_UNAVAILABLE_MESSAGE =
   "El asistente inteligente no está disponible en este momento. Puedo seguir ayudándote con órdenes directas como: abre el módulo dos, lee la pantalla, siguiente pregunta o ve al inicio.";
 export const UNSUPPORTED_BROWSER_MESSAGE =
@@ -95,6 +99,16 @@ const ROUTES: { pattern: RegExp; path: string; label: string }[] = [
   { pattern: /^(?:mis )?resultados$|^mi progreso$/, path: "/dashboard?tab=resultados", label: "tus resultados" },
 ];
 
+/** Letra de alternativa dicha en la frase: "opción b", "la c", "marca la a", "elijo la tercera". */
+function optionLetterIn(value: string): OptionLetter | null {
+  const direct =
+    value.match(/^(?:la )?(?:opcion|alternativa|letra|respuesta)? ?([abcd])$/) ??
+    value.match(/(?:opcion|alternativa|letra|marca|marco|marcar|elijo|elige|selecciona|respondo|responde|responder|contesta|contestar|es)(?: la)?(?: opcion| alternativa| letra)? ([abcd])\b/);
+  if (direct) return direct[1].toUpperCase() as OptionLetter;
+  const ordinal = value.match(/(?:elijo|elige|selecciona|marca|marco|responde|respondo|opcion|alternativa|es)(?: la)? (primera|segunda|tercera|cuarta)\b/);
+  return ordinal ? ("ABCD"[toNumber(ordinal[1]) - 1] as OptionLetter) : null;
+}
+
 export function interpretLocalCommand(
   text: string,
   options: { inQuestion?: boolean } = {}
@@ -137,17 +151,17 @@ export function interpretLocalCommand(
   if (/\bmodo simulacion\b/.test(value)) return { kind: "simulation" };
 
   if (options.inQuestion) {
-    const option =
-      value.match(/^(?:la )?(?:opcion|alternativa|letra|respuesta)? ?([abcd])$/) ??
-      value.match(/(?:opcion|alternativa|letra|marca|marco|marcar|elijo|elige|selecciona|respondo|responde)(?: la)?(?: opcion| alternativa| letra)? ([abcd])\b/);
-    if (option)
-      return { kind: "select_option", letter: option[1].toUpperCase() as OptionLetter };
-    const ordinal = value.match(/(?:elijo|elige|selecciona|marca|marco|responde|respondo|opcion|alternativa)(?: la)? (primera|segunda|tercera|cuarta)\b/);
-    if (ordinal)
-      return {
-        kind: "select_option",
-        letter: "ABCD"[toNumber(ordinal[1]) - 1] as OptionLetter,
-      };
+    if (/^(?:guarda|guardar|envia|enviar|entrega|entregar|termina|terminar|finaliza|finalizar)(?: (?:mis |las |el |la )?(?:respuestas|pretest|postest|evaluacion|examen|prueba|test))?$/.test(value))
+      return { kind: "submit_evaluation" };
+    // "En la pregunta 3 marca la B", "la respuesta de la pregunta dos es la c".
+    const numbered = value.match(new RegExp(`pregunta ${NUMBER}\\b`));
+    if (numbered && toNumber(numbered[1]) > 0) {
+      const letter = optionLetterIn(value.replace(numbered[0], " ").replace(/\s+/g, " ").trim());
+      if (letter)
+        return { kind: "select_option", letter, index: toNumber(numbered[1]) - 1 };
+    }
+    const letter = optionLetterIn(value);
+    if (letter) return { kind: "select_option", letter };
     if (/^(?:siguiente pregunta|pregunta siguiente|siguiente|proxima pregunta|avanza)$/.test(value))
       return { kind: "next_question" };
     if (/^(?:pregunta anterior|anterior pregunta|anterior|regresa a la pregunta anterior)$/.test(value))

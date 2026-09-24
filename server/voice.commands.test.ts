@@ -66,6 +66,33 @@ describe("local voice commands (sin IA)", () => {
     expect(interpretLocalCommand("opción b")).toBeNull();
   });
 
+  it("answers a specific question and submits the evaluation", () => {
+    const inQuestion = { inQuestion: true };
+    expect(interpretLocalCommand("en la pregunta tres marca la b", inQuestion)).toEqual({
+      kind: "select_option",
+      letter: "B",
+      index: 2,
+    });
+    expect(
+      interpretLocalCommand("la respuesta de la pregunta 10 es la d", inQuestion)
+    ).toEqual({ kind: "select_option", letter: "D", index: 9 });
+    expect(interpretLocalCommand("pregunta dos opción c", inQuestion)).toEqual({
+      kind: "select_option",
+      letter: "C",
+      index: 1,
+    });
+    expect(interpretLocalCommand("ir a la pregunta 4", inQuestion)).toEqual({
+      kind: "go_to_question",
+      index: 3,
+    });
+    expect(interpretLocalCommand("guardar evaluación", inQuestion)).toEqual({
+      kind: "submit_evaluation",
+    });
+    expect(interpretLocalCommand("enviar mis respuestas", inQuestion)).toEqual({
+      kind: "submit_evaluation",
+    });
+  });
+
   it("never processes credentials", () => {
     expect(interpretLocalCommand("lee mi contraseña")?.kind).toBe("decline");
   });

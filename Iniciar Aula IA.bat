@@ -5,7 +5,8 @@ cd /d "%~dp0"
 
 rem ==========================================================================
 rem  Inicia Aula IA y abre el navegador listo para usar solo con la voz:
-rem  - permite el microfono sin pedir clic (solo en este perfil del navegador)
+rem  - la primera vez, alguien debe pulsar "Permitir" en el aviso del microfono;
+rem    Chrome lo recuerda para siempre en este perfil
 rem  - permite que el asistente hable sin que nadie toque la pagina
 rem  - abre la app como ventana propia, sin barra de direcciones
 rem ==========================================================================
@@ -45,5 +46,5 @@ if not defined NAVEGADOR (
   exit /b 1
 )
 
-start "" "%NAVEGADOR%" --user-data-dir="%LocalAppData%\AulaIA\navegador" --app=http://localhost:3000 --start-maximized --autoplay-policy=no-user-gesture-required --use-fake-ui-for-media-stream --no-first-run --no-default-browser-check
+start "" "%NAVEGADOR%" --user-data-dir="%LocalAppData%\AulaIA\navegador" --app=http://localhost:3000 --start-maximized --autoplay-policy=no-user-gesture-required --no-first-run --no-default-browser-check
 exit /b 0

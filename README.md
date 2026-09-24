@@ -76,8 +76,9 @@ actividades, retos, interacciones con el Tutor IA y consultas. Para verla con un
   escuchar sin que digas la frase otra vez; después de dos silencios queda en espera de "Oye Jason".
 - Di **"detener asistente"** para terminar la conversación (seguirá atento a "Oye Jason").
 - Para usarla sin manos, abre la app con **`Iniciar Aula IA.bat`** (doble clic). Inicia el servidor
-  y abre Chrome (o Edge) en una ventana propia, con el micrófono permitido y la voz habilitada sin
-  que nadie toque la página. Los navegadores normales bloquean el audio hasta el primer clic.
+  y abre Chrome (o Edge) en una ventana propia, con la voz habilitada sin que nadie toque la
+  página (los navegadores normales bloquean el audio hasta el primer clic). **Solo la primera vez**,
+  una persona que acompañe debe pulsar **Permitir** en el aviso del micrófono; Chrome lo recuerda.
 - Atajos opcionales para docentes o acompañantes: botón "Hablar con Jason", **Ctrl + Mayús +
   Espacio** y **Escape**.
 
