@@ -118,7 +118,7 @@ Colores del **semáforo** (sección 2.7), separados de la marca para que no se c
 
 ```mermaid
 erDiagram
-    SEDES ||--o{ PERFILES : "sede principal"
+    SEDES ||--o{ PERFILES : "sede de inscripción"
     SEDES ||--o{ PERSONAL_SEDE : "tiene"
     PERFILES ||--o{ PERSONAL_SEDE : "trabaja en"
     PERFILES ||--o{ SUSCRIPCIONES : "compra"
@@ -163,7 +163,7 @@ erDiagram
         text dni UK
         text celular
         date fecha_nacimiento
-        uuid sede_principal_id FK
+        uuid sede_principal_id FK "sede de inscripción: el plan solo vale aquí"
         text qr_token UK "secreto, rotable"
         boolean acepta_datos "Ley 29733"
         timestamptz acepta_datos_fecha
@@ -196,7 +196,6 @@ erDiagram
         int personas "1, o 2 en el plan de 2 personas"
         int ingresos_por_mes "interdiario = 12, diario = null"
         numeric precio_base
-        boolean todas_las_sedes
         boolean activo
     }
 
@@ -486,7 +485,9 @@ Toda la lógica de las secciones 2.5 a 2.8 vive en `lib/reglas/` y en funciones 
 | Sede | Ubicación | Mapa |
 |---|---|---|
 | Sede 1 | Manylsa, Ate Vitarte, Lima | [Google Maps](https://maps.app.goo.gl/sSA3SueoAkF9gkxH7) |
-| Sede 2 | ❓ Nombre y dirección por confirmar | [Google Maps](https://maps.app.goo.gl/dBQWw7m2GTQiEFqV6) |
+| Sede 2 | Amauta, Asociación Leonardo Toribio de la Laguna Azul, Ate Vitarte, Lima 15491 (referencia: frente al Mercado La Huaca) | [Google Maps](https://maps.app.goo.gl/dBQWw7m2GTQiEFqV6) |
+
+**Regla de sede (confirmada):** el socio **solo puede entrenar en la sede donde se inscribió** (`sede_principal_id`). Su plan no vale en la otra sede. Si quiere entrar a la otra sede, paga la **entrada del día de S/ 10**. Solo el dueño puede cambiar la sede de inscripción de un socio, y el cambio queda en auditoría.
 
 Los precios son **los mismos** para las dos sedes. Se mostrarán en los **afiches** de "Planes y precios", y cada afiche lleva al pago de su plan.
 
@@ -526,7 +527,7 @@ Estos precios se cargan en `seed.sql` como datos iniciales. Cuando cambien, el d
 
 ### 3.1 Público (sin iniciar sesión)
 1. **Inicio:** logo, sedes (con enlace a Google Maps), horarios y la **galería de afiches** (planes y promociones vigentes). Al tocar un afiche → **registro o inicio de sesión**, y luego directo al pago de ese plan.
-2. **Registro:** datos + correo (para las boletas) + consentimiento Ley 29733 + casilla opcional de promociones. Si es menor de 18: datos del apoderado.
+2. **Registro:** datos + **sede de inscripción** (Sede 1 o Sede 2) + correo (para las boletas) + consentimiento Ley 29733 + casilla opcional de promociones. Si es menor de 18: datos del apoderado.
 3. **Iniciar sesión / Recuperar contraseña.**
 4. **Política de privacidad, Términos (sin devoluciones ni congelamiento) y Libro de Reclamaciones.**
 5. **Cómo instalar la app y activar avisos** (guía Android / iPhone).
@@ -629,7 +630,7 @@ Reglas:
 2. Recepción escanea → el servidor busca al socio y revisa, en este orden:
    1. ¿Hoy es **domingo o feriado**? → ⬛ denegado, ofrecer **entrada del día S/ 10**.
    2. ¿Tiene suscripción **activa**? Si no → ⬛ *"Sin plan vigente"* + **Cobrar entrada S/ 10**.
-   3. ¿El plan permite **esta sede**?
+   3. ¿Es la **sede donde se inscribió**? Si no → ⬛ *"Inscrito en Sede 1: su plan no vale aquí"* + **Cobrar entrada S/ 10**.
    4. ¿Ya registró ingreso **hoy**? → ⬛ *"Ya ingresó hoy"*.
    5. Si es **interdiario**: ¿`ingresos_usados < ingresos_totales`?
    6. Se muestran las etiquetas de **tipo de acceso** y de **menor de edad** (sección 2.9 y 2.10).
@@ -751,7 +752,7 @@ urban-force-gym/
 19. Protección de rutas (un socio no entra a `/admin`) y barra de navegación inferior según rol.
 
 ### Fase 3 — Administración básica
-20. CRUD de sedes (dirección, mapa, horarios).
+20. CRUD de sedes (dirección, mapa, horarios) y cambio de sede de inscripción de un socio (solo dueño).
 21. CRUD de planes (modalidad, acceso, meses, días extra, 1 o 2 personas → cupo automático).
 22. Crear personal y asignar sede.
 23. CRUD de feriados con horario especial.
@@ -914,14 +915,15 @@ Fuentes: [Riqra](https://blog.riqra.com/posts/pasarelas-pago-online-peru), [Culq
 15. **Yape:** al número del dueño (sección 4.1).
 16. **Colores:** amarillo `#F0B400` y negro `#0A0A0A`, medidos en el logo oficial (sección 1.3).
 17. **Devoluciones:** no hay (sección 2.10).
+18. **Sede 2:** Amauta, Asociación Leonardo Toribio de la Laguna Azul, Ate Vitarte, frente al Mercado La Huaca (sección 2.9).
+19. **Uso de sedes:** el plan solo vale en la sede donde se inscribió el socio (sección 2.9).
 
 **Pendiente ❓**
-18. **Sede 2:** ¿cuál es su nombre y dirección? (El enlace de Google Maps no se pudo abrir desde aquí.)
-19. **Uso de las 2 sedes:** ¿un socio inscrito en una sede puede entrenar también en la otra con el mismo plan?
 20. **Plan de 2 personas:**
     - ¿Es **solo máquinas** o **máquinas y aeróbicos**?
     - ¿Las dos personas deben empezar el mismo día?
     - ¿La segunda persona debe ser alguien nuevo o puede ser un socio que ya tenía plan?
+    - ¿Las dos personas deben inscribirse en la **misma sede**?
 21. **Promociones "3 meses + 15 días" (S/ 249) y "3 meses + 1 semana" (S/ 189):** ¿son **solo máquinas** o **máquinas y aeróbicos**?
 22. **Entrada del día (S/ 10):** ¿incluye aeróbicos o solo máquinas?
 23. **Aprobación de pagos por Yape:** como el dinero llega al celular del dueño, la propuesta es que **el dueño los apruebe** desde la app. ¿Está bien, o la recepción también debe poder aprobarlos?
