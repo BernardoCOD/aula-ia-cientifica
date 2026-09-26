@@ -109,6 +109,14 @@ erDiagram
     SUSCRIPCIONES ||--o{ ASISTENCIAS : "valida"
     PERFILES ||--o{ ALERTAS : "recibe"
     PERFILES ||--o{ AUDITORIA : "realiza"
+    SEDES |o--o{ FERIADOS : "cierre solo en"
+
+    FERIADOS {
+        date fecha PK
+        text nombre "Fiestas Patrias, Navidad..."
+        uuid sede_id FK "null = todas las sedes"
+        boolean sede_cerrada
+    }
 
     SEDES {
         uuid id PK
@@ -144,10 +152,9 @@ erDiagram
     PLANES {
         uuid id PK
         text nombre "Mensual diario, Trimestral interdiario, Pase diario..."
-        text modalidad "diario | interdiario | pase_diario"
-        int duracion_dias "30, 90, 1..."
+        text modalidad "diario | interdiario | pase_diario | entrada_especial"
+        int duracion_meses "1, 3... (0 = un solo día)"
         int ingresos_por_semana "diario = 6, interdiario = 3"
-        int ingresos_totales "calculado al crear el plan"
         numeric precio
         boolean todas_las_sedes
         boolean activo
@@ -156,7 +163,7 @@ erDiagram
     PROMOCIONES {
         uuid id PK
         text nombre "2x1, descuento, etc."
-        text tipo "dos_por_uno | porcentaje | monto_fijo"
+        text tipo "dos_por_uno | porcentaje | monto_fijo | cortesia_gratis"
         numeric valor
         uuid plan_id FK
         date vigente_desde
@@ -173,7 +180,7 @@ erDiagram
         text estado "pendiente_pago | activa | congelada | vencida | cancelada"
         date fecha_inicio
         date fecha_fin
-        int ingresos_totales "copiado del plan al comprar"
+        int ingresos_totales "cupo real calculado con las fechas al activar"
         int ingresos_usados
         numeric precio_final
         timestamptz creado_en
@@ -230,7 +237,8 @@ erDiagram
 - **sedes:** las 2 sedes del gimnasio (se deja preparada para una 3.ª).
 - **perfiles:** datos de **toda persona** que usa la app. El campo `rol` decide qué puede hacer. Se enlaza 1 a 1 con el usuario de Supabase Auth.
 - **personal_sede:** en qué sede(s) trabaja cada recepcionista o entrenador. Es la base del RLS por sede.
-- **planes:** catálogo de membresías. **Cada duración existe en dos modalidades**, diario e interdiario (por ejemplo "Mensual diario" y "Mensual interdiario"), además del pase diario. Ver la regla en la sección 2.5.
+- **planes:** catálogo de membresías. **Cada duración existe en dos modalidades**, diario e interdiario (por ejemplo "Mensual diario" y "Mensual interdiario"). También incluye el pase diario y la **entrada especial de S/ 10** para domingos y feriados. Las reglas están en las secciones 2.5 y 2.6.
+- **feriados:** días en que las suscripciones y los pases gratuitos no valen.
 - **promociones:** ofertas temporales (2x1, % de descuento, monto fijo).
 - **suscripciones:** la membresía concreta de un cliente, con fechas y estado. En el **2x1** se crean **dos** suscripciones vinculadas entre sí.
 - **pagos:** cada pago con su voucher. `codigo_operacion` es **único** para que nadie reutilice la misma captura de Yape.
@@ -270,21 +278,50 @@ Todos los planes (mensual, trimestral, etc.) se venden en **dos modalidades**:
 
 | | **Diario** | **Interdiario** |
 |---|---|---|
-| Días que cuentan | Lunes a sábado (**los domingos no cuentan**) | Lunes a sábado (**los domingos no cuentan**) |
-| Ingresos por semana | Hasta 6 (1 por día) | Hasta **3** |
-| Ejemplo, plan de 1 mes (30 días) | Puede venir **todos los días del mes excepto domingos** (~26 ingresos) | **3 veces por semana** → cupo del mes ≈ 12–13 ingresos (ver sección 8) |
+| Días en que vale la suscripción | Lunes a sábado que **no sean feriado** | Lunes a sábado que **no sean feriado** |
+| Ingresos | 1 por día, todos los días válidos | **Cupo total** = 3 por semana (lunes a sábado), **depende del mes** |
+| Cómo los usa | Cuando quiera, 1 por día | **Como quiera**, 1 por día: puede venir seguido, pero el cupo se le acaba antes |
 | Al agotar el cupo | — (solo vence por fecha) | Se **deniega** el ingreso y se notifica |
+| Ingresos no usados | — | **Se pierden** cuando termina el plan (no pasan al siguiente) |
 
-**Cómo se calcula:**
-- `ingresos_totales` = número de semanas del plan × `ingresos_por_semana` (se fija al crear el plan y se **copia a la suscripción** al comprarla, para que un cambio de precio o de regla no afecte a quien ya pagó).
-- Cada ingreso **permitido** suma 1 a `ingresos_usados`. Máximo 1 ingreso por día en ambas modalidades.
-- La suscripción termina **por lo que ocurra primero**: se llega a `fecha_fin` **o** (en interdiario) `ingresos_usados = ingresos_totales`.
+**Cálculo del cupo del interdiario (depende del mes):**
+- Se cuenta cuántos días de **lunes a sábado** hay entre `fecha_inicio` y `fecha_fin` y se **divide entre 2**, redondeando hacia abajo. Es lo mismo que "3 de cada 6 días", o sea, 3 por semana sin contar domingos.
+- Ejemplos reales:
+  - **Febrero 2026** (1 al 28): 24 días de lunes a sábado → cupo **12**.
+  - **Octubre 2026** (1 al 31): 27 días de lunes a sábado → cupo **13**.
+- El cupo se calcula **con las fechas reales al activar la suscripción** y se guarda en `ingresos_totales`. Así no cambia aunque luego se edite el plan.
+
+**Otras reglas:**
+- Cada ingreso **permitido** suma 1 a `ingresos_usados`. Máximo 1 ingreso por día en ambas modalidades. **No hay tope semanal**: el cliente reparte su cupo como quiera.
+- La suscripción termina **por lo que ocurra primero**: llega a `fecha_fin` **o** (en interdiario) `ingresos_usados = ingresos_totales`. Si llega `fecha_fin` con ingresos sin usar, esos ingresos **se pierden**.
 
 **Mensajes al cliente (interdiario):**
-- Cuando le quedan 2 ingresos: *"Te quedan 2 ingresos en tu plan interdiario."*
-- Al agotarlos (en la app y en la pantalla de recepción): *"Ya no tienes ingresos disponibles: completaste todos los ingresos de tu plan interdiario. Renueva tu plan para seguir entrenando."* + botón **Renovar**.
+- **Ritmo:** si viene más seguido que 3 por semana, la app avisa: *"A este ritmo tus ingresos se acabarán el 18 de octubre, antes de que termine tu plan (31 de octubre)."*
+- **Por agotarse:** cuando le quedan 2 ingresos: *"Te quedan 2 ingresos en tu plan interdiario."*
+- **Agotado** (en la app y en la pantalla de recepción): *"Ya no tienes ingresos disponibles: completaste todos los ingresos de tu plan interdiario. Renueva tu plan para seguir entrenando."* + botón **Renovar**.
+- **Fin cercano con ingresos sin usar:** 3 días antes de `fecha_fin`: *"Te quedan 4 ingresos y tu plan termina el 31 de octubre. Los ingresos no usados se pierden."*
 
-Toda esta lógica vive en `lib/reglas/ingresos.ts` y en la función SQL que registra la asistencia (para que no se pueda saltar desde el navegador), con pruebas automáticas para cada caso: domingo, 4.º ingreso de la semana, último ingreso del cupo, plan vencido por fecha con ingresos sobrantes.
+### 2.6 Domingos y feriados
+El gimnasio **abre los domingos**, pero ese día **ninguna suscripción es válida** (ni diaria ni interdiaria).
+
+| Día | ¿Vale la suscripción? | ¿Valen los pases gratuitos o de cortesía? | ¿Cómo entra el cliente? |
+|---|---|---|---|
+| Lunes a sábado normal | ✅ | ✅ | Con su QR |
+| **Domingo** | ❌ | ⚠️ por confirmar | **Entrada suelta de S/ 10**, pagada en recepción |
+| **Feriado** | ❌ | ❌ **No se aceptan** | **Entrada suelta de S/ 10**, pagada en recepción |
+
+- **Tabla nueva `feriados`:** fecha y nombre, cargada por el admin cada año, por ejemplo 28 y 29 de julio. Si una sede cierra ese día, se indica la sede.
+- **Plan especial `entrada_especial`:** precio configurable, hoy **S/ 10**. Recepción lo vende en 2 toques.
+- **Escaneo en domingo o feriado:** el QR muestra: *"Hoy es domingo/feriado: tu plan no aplica. Entrada: S/ 10."* con el botón **Cobrar entrada**.
+- **Cupo del interdiario:** un domingo o feriado **no consume** ingresos del plan.
+
+Toda esta lógica vive en `lib/reglas/ingresos.ts` y en la función SQL que registra la asistencia, para que no se pueda saltar desde el navegador. Tendrá pruebas automáticas para cada caso:
+- domingo y feriado
+- pase gratuito usado en feriado
+- dos ingresos el mismo día
+- cupo de febrero frente a octubre
+- último ingreso del cupo
+- plan vencido por fecha con ingresos sobrantes
 
 ---
 
@@ -300,7 +337,9 @@ Toda esta lógica vive en `lib/reglas/ingresos.ts` y en la función SQL que regi
 5. **Cómo instalar la app** (guía Android / iPhone).
 
 ### 3.2 Cliente
-1. **Mi membresía:** plan y modalidad (diario / interdiario), estado (color verde / amarillo / rojo), días que faltan. Si es interdiario: **"Ingresos: 7 de 13 usados · Esta semana: 2 de 3"**.
+1. **Mi membresía:** plan y modalidad (diario / interdiario), estado (color verde / amarillo / rojo), días que faltan. Si es interdiario, muestra el uso del cupo y, si va muy rápido, el aviso de ritmo:
+   - **"Ingresos: 7 de 13 usados"**
+   - *"A este ritmo se acaban el 18 de octubre"*
 2. **Mi QR:** QR grande a pantalla completa y con brillo alto para escanear en recepción.
 3. **Comprar / Renovar plan:** elegir plan y promoción → pagar.
 4. **Pagar:** QR de Yape/Plin del gimnasio + subir foto del voucher + código de operación (v1) · botón de pasarela (v2).
@@ -314,7 +353,7 @@ Toda esta lógica vive en `lib/reglas/ingresos.ts` y en la función SQL que regi
 2. **Buscar cliente** por DNI o nombre (por si olvidó el celular).
 3. **Pagos pendientes:** lista con la foto del voucher → **Aprobar** / **Rechazar** (con motivo).
 4. **Registrar cliente nuevo** en mostrador.
-5. **Cobro en efectivo** y venta de **pase diario**.
+5. **Cobro en efectivo**, venta de **pase diario** y de la **entrada de S/ 10** para domingos y feriados.
 6. **Asistencias de hoy** de su sede.
 7. **Cierre de caja del día** (total por método: efectivo, Yape, Plin).
 
@@ -375,9 +414,9 @@ Reglas: el `codigo_operacion` no se puede repetir; el monto del voucher debe ser
 2. Recepción escanea → el servidor busca al cliente y revisa:
    - ¿Tiene suscripción **activa** y `fecha_fin ≥ hoy`?
    - ¿El plan permite **esta sede**?
-   - ¿Hoy es **lunes a sábado**? (los domingos no cuentan)
+   - ¿Hoy es **domingo o feriado**? → la suscripción no aplica. Si es feriado, tampoco aplican los pases gratuitos. Se ofrece **cobrar entrada de S/ 10** (sección 2.6).
    - ¿Ya registró ingreso **hoy**? (evita doble escaneo; máximo 1 por día)
-   - Si es **interdiario**: ¿lleva menos de **3 ingresos esta semana**? ¿`ingresos_usados < ingresos_totales`? (sección 2.5)
+   - Si es **interdiario**: ¿`ingresos_usados < ingresos_totales`? (sección 2.5)
 3. Resultado en pantalla grande (✅/❌) y se guarda en `asistencias` **siempre**, incluso si es denegado.
    - Si fue permitido: `ingresos_usados + 1`. Si con ese ingreso le quedan 2 → alerta `pocos_ingresos`; si llegó al cupo → estado `vencida` + alerta `ingresos_agotados`.
    - Si fue denegado por cupo: motivo *"Completó todos los ingresos de su plan interdiario"* y el cliente recibe la notificación con el botón **Renovar**.
@@ -486,7 +525,8 @@ urban-force-gym/
 ### Fase 5 — Asistencia con QR
 31. Generar `qr_token` y pantalla "Mi QR".
 32. Escáner con cámara en recepción.
-33. Reglas de ingreso en `lib/reglas/` **con pruebas** (diario, interdiario, pase diario, domingos, tope semanal, cupo total, sede).
+33. Reglas de ingreso en `lib/reglas/` **con pruebas**: diario, interdiario (cupo según el mes), pase diario, domingos, feriados, cortesías en feriado y sede.
+33b. Tabla `feriados` + pantalla del admin para cargarlos + botón "Cobrar entrada S/ 10" en el escáner.
 34. Registrar asistencias permitidas y denegadas.
 35. Búsqueda manual por DNI.
 36. Regenerar QR (admin).
@@ -580,12 +620,10 @@ Fuentes: [Riqra](https://blog.riqra.com/posts/pasarelas-pago-online-peru), [Culq
 
 ## 8. Dudas a confirmar con el dueño (antes de programar)
 
-1. **Plan interdiario — detalles pendientes.** *(Ya confirmado: todos los planes tienen modalidad diario o interdiario; los domingos no cuentan; el interdiario es de 3 veces por semana y al agotar el cupo se deniega el ingreso y se notifica. Ver sección 2.5.)* Falta definir:
-   - a) El **cupo exacto** de 1 mes interdiario: ¿**12** (4 semanas × 3) o **13** (30 días ≈ 4.3 semanas)? ¿Y el del trimestral (36 o 39)?
-   - b) ¿El tope de **3 por semana es estricto**, o puede usar el cupo del mes como quiera (por ejemplo, 5 días en una semana y 1 en la siguiente)?
-   - c) Si en una semana solo vino 1 vez, ¿los 2 ingresos no usados **se pierden** o se quedan en el cupo total?
-   - d) ¿El gimnasio **abre los domingos**? Si abre, ¿un cliente puede entrar ese día pagando aparte o con otro plan?
-   - e) ¿Qué pasa con los **feriados**?
+1. **Diario, interdiario, domingos y feriados.** Lo principal ya está confirmado (ver secciones 2.5 y 2.6). Faltan tres detalles:
+   - a) Los **feriados** entre lunes y sábado, ¿**reducen** el cupo del interdiario? Por ahora se cuentan dentro del cupo, porque el cliente puede venir otro día.
+   - b) Los **domingos**, ¿se aceptan los pases gratuitos o de cortesía, o solo la entrada de S/ 10?
+   - c) ¿Qué significa "**temperatura**" en la regla del domingo? ¿Se refiere a una temporada, por ejemplo verano, con otras reglas o precios?
 2. **2x1 con dos cuentas.** ¿Las dos personas deben inscribirse el **mismo día**? ¿Deben tener el **mismo plan y la misma fecha de vencimiento**? ¿Si uno congela, el otro también? ¿Se puede cambiar de acompañante?
 3. **Umbral de vencimiento.** ¿Con cuántos días de anticipación avisar (3, 5, 7)? ¿Hay **días de tolerancia** después de vencer? ¿Se puede renovar antes y que los días se sumen?
 4. **Pase diario.** ¿Precio? ¿Vale para **cualquier sede**? ¿Se vende solo en recepción o también en la app? ¿Se pide DNI / registro completo o solo nombre? ¿Vale para el día calendario o por 24 horas?
