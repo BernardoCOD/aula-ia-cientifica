@@ -98,9 +98,7 @@ erDiagram
     PERFILES ||--o{ PERSONAL_SEDE : "trabaja en"
     PERFILES ||--o{ SUSCRIPCIONES : "compra"
     PLANES ||--o{ SUSCRIPCIONES : "define"
-    PROMOCIONES ||--o{ SUSCRIPCIONES : "aplica a"
-    PLANES ||--o{ PROMOCIONES : "en oferta"
-    SUSCRIPCIONES ||--o{ SUSCRIPCIONES : "2x1: vinculada a"
+    SEDES |o--o{ PROMOCIONES : "se muestra en"
     SUSCRIPCIONES ||--o{ PAGOS : "se paga con"
     SEDES ||--o{ PAGOS : "se registra en"
     PERFILES ||--o{ PAGOS : "aprobado por"
@@ -162,10 +160,10 @@ erDiagram
 
     PROMOCIONES {
         uuid id PK
-        text nombre "2x1, descuento, etc."
-        text tipo "dos_por_uno | porcentaje | monto_fijo | cortesia_gratis"
-        numeric valor
-        uuid plan_id FK
+        text titulo "texto alternativo de la imagen"
+        text imagen_url "imagen en Storage (bucket público)"
+        uuid sede_id FK "null = todas las sedes"
+        int orden "posición en el carrusel"
         date vigente_desde
         date vigente_hasta
         boolean activa
@@ -175,8 +173,6 @@ erDiagram
         uuid id PK
         uuid perfil_id FK
         uuid plan_id FK
-        uuid promocion_id FK "opcional"
-        uuid suscripcion_vinculada_id FK "pareja del 2x1"
         text estado "pendiente_pago | activa | congelada | vencida | cancelada"
         date fecha_inicio
         date fecha_fin
@@ -191,7 +187,7 @@ erDiagram
         uuid suscripcion_id FK
         uuid sede_id FK
         numeric monto
-        text metodo "yape | plin | efectivo | tarjeta | pasarela"
+        text metodo "yape | plin | efectivo | tarjeta | pasarela | cortesia"
         text estado "pendiente | aprobado | rechazado"
         text voucher_url "foto en Storage"
         text codigo_operacion UK "evita vouchers repetidos"
@@ -239,8 +235,8 @@ erDiagram
 - **personal_sede:** en qué sede(s) trabaja cada recepcionista o entrenador. Es la base del RLS por sede.
 - **planes:** catálogo de membresías. **Cada duración existe en dos modalidades**, diario e interdiario (por ejemplo "Mensual diario" y "Mensual interdiario"). También incluye el pase diario y la **entrada especial de S/ 10** para domingos y feriados. Las reglas están en las secciones 2.5 y 2.6.
 - **feriados:** días en que las suscripciones y los pases gratuitos no valen.
-- **promociones:** ofertas temporales (2x1, % de descuento, monto fijo).
-- **suscripciones:** la membresía concreta de un cliente, con fechas y estado. En el **2x1** se crean **dos** suscripciones vinculadas entre sí.
+- **promociones:** **imágenes** (afiches) que el dueño sube para que los clientes las vean en la app. Tienen fecha de inicio y fin, y desaparecen solas al vencer. Son **solo informativas**: no cambian precios ni reglas en el sistema.
+- **suscripciones:** la membresía concreta de un cliente, con fechas y estado.
 - **pagos:** cada pago con su voucher. `codigo_operacion` es **único** para que nadie reutilice la misma captura de Yape.
 - **asistencias:** cada escaneo del QR (también los **denegados**, para saber quién intentó entrar vencido).
 - **alertas:** notificaciones enviadas al cliente.
@@ -342,7 +338,7 @@ Toda esta lógica vive en `lib/reglas/ingresos.ts` y en la función SQL que regi
    - **"Ingresos: 7 de 13 usados"**
    - *"A este ritmo se acaban el 18 de octubre"*
 2. **Mi QR:** QR grande a pantalla completa y con brillo alto para escanear en recepción.
-3. **Comprar / Renovar plan:** elegir plan y promoción → pagar.
+3. **Comprar / Renovar plan:** elegir plan → pagar. Arriba se muestra el carrusel de promociones vigentes.
 4. **Pagar:** QR de Yape/Plin del gimnasio + subir foto del voucher + código de operación (v1) · botón de pasarela (v2).
 5. **Mis pagos:** historial y estado (pendiente, aprobado, rechazado con motivo).
 6. **Mis asistencias:** calendario de días que fue.
@@ -366,13 +362,13 @@ Toda esta lógica vive en `lib/reglas/ingresos.ts` y en la función SQL que regi
 ### 3.5 Administrador (dueño)
 1. **Dashboard:** ingresos del mes, socios activos, por vencer, nuevos; comparación Sede A vs Sede B.
 2. **Planes:** crear, editar precio, activar/desactivar.
-3. **Promociones:** crear 2x1, descuentos, fechas de vigencia.
+3. **Promociones:** subir imagen (se comprime automáticamente), elegir sede o todas, fechas de vigencia y orden en el carrusel.
 4. **Personal:** crear usuarios de recepción/entrenadores y asignarles sede.
 5. **Sedes.**
 6. **Clientes:** buscar, editar, congelar membresía.
 7. **Reportes:** pagos por fecha/sede/método, exportar a Excel (CSV).
 8. **Auditoría:** quién aprobó qué.
-9. **Configuración:** días de aviso de vencimiento, QR de Yape/Plin, reglas del interdiario.
+9. **Configuración:** QR de Yape/Plin, precio de la entrada de domingo/feriado.
 
 ---
 
@@ -385,7 +381,7 @@ sequenceDiagram
     participant App
     participant BD as Supabase
     actor R as Recepción
-    C->>App: Elige plan (+ promoción)
+    C->>App: Elige plan
     App->>BD: Crea suscripción "pendiente_pago"
     App-->>C: Muestra QR Yape/Plin y monto exacto
     C->>C: Paga desde Yape/Plin
@@ -425,16 +421,18 @@ Reglas: el `codigo_operacion` no se puede repetir; el monto del voucher debe ser
 
 ### 4.4 Alertas de vencimiento
 1. **Vercel Cron** ejecuta una tarea todos los días a las **7:00 a. m. (hora de Lima)**.
-2. Busca suscripciones que vencen en **N días** (N configurable, ver dudas) y las del día.
+2. Busca suscripciones que vencen **dentro de 3 días** y las que vencen hoy.
+   - Mensaje: *"Tu plan vence en 3 días (31 de octubre). Renueva para no perder tu continuidad."* + botón **Renovar**.
+   - Si es interdiario y le quedan ingresos, se agregan al mensaje: *"Te quedan 4 ingresos; los no usados se pierden."*
 3. Crea la alerta en la app (y en v2 correo/WhatsApp) con un botón **"Renovar"**.
 4. Marca como `vencida` las suscripciones cuya `fecha_fin` ya pasó.
-5. En recepción, el escáner muestra **amarillo** si al cliente le quedan ≤ N días, para recordárselo en persona.
+5. En recepción, el escáner muestra **amarillo** si al cliente le quedan 3 días o menos, para recordárselo en persona.
 
-### 4.5 Promoción 2x1
-1. El titular compra el plan con la promoción 2x1 y escribe el **DNI o celular del acompañante**.
-2. Si el acompañante no tiene cuenta, se le envía una invitación; debe registrarse y **aceptar la Ley 29733 él mismo** (no se puede registrar a otra persona sin su consentimiento).
-3. Se crean **dos suscripciones** vinculadas (`suscripcion_vinculada_id`) y **un solo pago**.
-4. Cada uno tiene **su propio QR** y su propio control de asistencias.
+### 4.5 Publicar una promoción (imagen)
+1. El admin sube la imagen del afiche. La app la **comprime** para que cargue rápido en celulares con pocos datos.
+2. Elige la sede (o todas), la fecha de inicio y la de fin.
+3. La imagen aparece en el **carrusel** del inicio público y de la pantalla "Comprar / Renovar".
+4. Al pasar `vigente_hasta`, deja de mostrarse sola. No hay que borrarla.
 
 ---
 
@@ -461,7 +459,7 @@ urban-force-gym/
 │   └── navegacion/               # Barra inferior por rol
 ├── lib/
 │   ├── supabase/                 # Cliente para navegador y para servidor
-│   ├── reglas/                   # Lógica de negocio: interdiario, vencimiento, 2x1
+│   ├── reglas/                   # Lógica de negocio: interdiario, vencimiento, domingos/feriados
 │   ├── pagos/                    # Adaptador de pasarela (Izipay/Culqi)
 │   └── validaciones/             # Esquemas zod (DNI, celular…)
 ├── supabase/
@@ -475,7 +473,7 @@ urban-force-gym/
 └── README.md
 ```
 
-¿Por qué `lib/reglas/` aparte? Porque la lógica del interdiario o del 2x1 es **lo que más va a cambiar** y lo que más se debe probar. Separada de las pantallas es fácil de testear.
+¿Por qué `lib/reglas/` aparte? Porque la lógica del interdiario, domingos y feriados es **lo que más va a cambiar** y lo que más se debe probar. Separada de las pantallas es fácil de testear.
 
 ---
 
@@ -510,7 +508,7 @@ urban-force-gym/
 ### Fase 3 — Administración básica
 19. CRUD de sedes.
 20. CRUD de planes.
-21. CRUD de promociones.
+21. Promociones: subir imagen al Storage, fechas de vigencia y carrusel.
 22. Crear personal y asignar sede.
 
 ### Fase 4 — Compra y pago manual (v1)
@@ -553,10 +551,9 @@ urban-force-gym/
 
 ### Fase 9 — Versión 2
 50. Pasarela de pagos (sección 7).
-51. Promoción 2x1 con invitación.
-52. Alertas por WhatsApp/correo.
-53. Congelamiento de membresía.
-54. Rutinas y progreso para entrenadores.
+51. Alertas por WhatsApp/correo.
+52. Congelamiento de membresía.
+53. Rutinas y progreso para entrenadores.
 
 ---
 
@@ -622,9 +619,9 @@ Fuentes: [Riqra](https://blog.riqra.com/posts/pasarelas-pago-online-peru), [Culq
 ## 8. Dudas a confirmar con el dueño (antes de programar)
 
 1. ~~**Diario, interdiario, domingos y feriados.**~~ ✅ **Confirmado.** Ver secciones 2.5 y 2.6.
-2. **2x1 con dos cuentas.** ¿Las dos personas deben inscribirse el **mismo día**? ¿Deben tener el **mismo plan y la misma fecha de vencimiento**? ¿Si uno congela, el otro también? ¿Se puede cambiar de acompañante?
-3. **Umbral de vencimiento.** ¿Con cuántos días de anticipación avisar (3, 5, 7)? ¿Hay **días de tolerancia** después de vencer? ¿Se puede renovar antes y que los días se sumen?
-4. **Pase diario.** ¿Precio? ¿Vale para **cualquier sede**? ¿Se vende solo en recepción o también en la app? ¿Se pide DNI / registro completo o solo nombre? ¿Vale para el día calendario o por 24 horas?
+2. ~~**Promociones.**~~ ✅ **Confirmado:** son imágenes que el dueño publica, solo informativas (sección 4.5). No hay lógica de 2x1.
+3. **Vencimiento.** ✅ Aviso **3 días antes** (sección 4.4). Falta: ¿hay **días de tolerancia** después de vencer? ¿Se puede renovar antes y que los días se sumen?
+4. **Pase diario (lunes a sábado).** ✅ Vale para **las dos sedes**. Falta confirmar qué significa "contacte": ¿el precio no se muestra en la app y el cliente debe contactar al gimnasio? También falta: ¿se vende solo en recepción o también en la app? ¿Se pide DNI o solo nombre?
 5. **Sedes.** ¿Todos los planes permiten entrar a las 2 sedes o hay planes por sede? ¿Los precios son iguales en ambas?
 6. **Congelamiento.** ¿Se permite congelar (viajes, lesiones)? ¿Cuántos días como máximo?
 7. **Horarios.** ¿Hay planes con horario restringido (por ejemplo, solo mañanas)?
