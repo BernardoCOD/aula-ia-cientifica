@@ -307,17 +307,18 @@ El gimnasio **abre los domingos**, pero ese día **ninguna suscripción es váli
 | Día | ¿Vale la suscripción? | ¿Valen los pases gratuitos o de cortesía? | ¿Cómo entra el cliente? |
 |---|---|---|---|
 | Lunes a sábado normal | ✅ | ✅ | Con su QR |
-| **Domingo** | ❌ | ⚠️ por confirmar | **Entrada suelta de S/ 10**, pagada en recepción |
+| **Domingo** | ❌ | ❌ **No se aceptan** | **Entrada suelta de S/ 10**, pagada en recepción |
 | **Feriado** | ❌ | ❌ **No se aceptan** | **Entrada suelta de S/ 10**, pagada en recepción |
 
 - **Tabla nueva `feriados`:** fecha y nombre, cargada por el admin cada año, por ejemplo 28 y 29 de julio. Si una sede cierra ese día, se indica la sede.
 - **Plan especial `entrada_especial`:** precio configurable, hoy **S/ 10**. Recepción lo vende en 2 toques.
 - **Escaneo en domingo o feriado:** el QR muestra: *"Hoy es domingo/feriado: tu plan no aplica. Entrada: S/ 10."* con el botón **Cobrar entrada**.
-- **Cupo del interdiario:** un domingo o feriado **no consume** ingresos del plan.
+- **Cupo del interdiario:** un domingo o feriado **no consume** ingresos del plan. Los feriados de lunes a sábado **no reducen** el cupo, porque el cliente puede venir otro día.
+- **En resumen:** domingos y feriados tienen la misma regla. Solo se entra con la entrada de S/ 10.
 
 Toda esta lógica vive en `lib/reglas/ingresos.ts` y en la función SQL que registra la asistencia, para que no se pueda saltar desde el navegador. Tendrá pruebas automáticas para cada caso:
 - domingo y feriado
-- pase gratuito usado en feriado
+- pase gratuito usado en domingo o feriado
 - dos ingresos el mismo día
 - cupo de febrero frente a octubre
 - último ingreso del cupo
@@ -414,7 +415,7 @@ Reglas: el `codigo_operacion` no se puede repetir; el monto del voucher debe ser
 2. Recepción escanea → el servidor busca al cliente y revisa:
    - ¿Tiene suscripción **activa** y `fecha_fin ≥ hoy`?
    - ¿El plan permite **esta sede**?
-   - ¿Hoy es **domingo o feriado**? → la suscripción no aplica. Si es feriado, tampoco aplican los pases gratuitos. Se ofrece **cobrar entrada de S/ 10** (sección 2.6).
+   - ¿Hoy es **domingo o feriado**? → no aplican ni la suscripción ni los pases gratuitos. Se ofrece **cobrar entrada de S/ 10** (sección 2.6).
    - ¿Ya registró ingreso **hoy**? (evita doble escaneo; máximo 1 por día)
    - Si es **interdiario**: ¿`ingresos_usados < ingresos_totales`? (sección 2.5)
 3. Resultado en pantalla grande (✅/❌) y se guarda en `asistencias` **siempre**, incluso si es denegado.
@@ -525,7 +526,7 @@ urban-force-gym/
 ### Fase 5 — Asistencia con QR
 31. Generar `qr_token` y pantalla "Mi QR".
 32. Escáner con cámara en recepción.
-33. Reglas de ingreso en `lib/reglas/` **con pruebas**: diario, interdiario (cupo según el mes), pase diario, domingos, feriados, cortesías en feriado y sede.
+33. Reglas de ingreso en `lib/reglas/` **con pruebas**: diario, interdiario (cupo según el mes), pase diario, domingos, feriados, cortesías en domingo o feriado y sede.
 33b. Tabla `feriados` + pantalla del admin para cargarlos + botón "Cobrar entrada S/ 10" en el escáner.
 34. Registrar asistencias permitidas y denegadas.
 35. Búsqueda manual por DNI.
@@ -620,10 +621,7 @@ Fuentes: [Riqra](https://blog.riqra.com/posts/pasarelas-pago-online-peru), [Culq
 
 ## 8. Dudas a confirmar con el dueño (antes de programar)
 
-1. **Diario, interdiario, domingos y feriados.** Lo principal ya está confirmado (ver secciones 2.5 y 2.6). Faltan tres detalles:
-   - a) Los **feriados** entre lunes y sábado, ¿**reducen** el cupo del interdiario? Por ahora se cuentan dentro del cupo, porque el cliente puede venir otro día.
-   - b) Los **domingos**, ¿se aceptan los pases gratuitos o de cortesía, o solo la entrada de S/ 10?
-   - c) ¿Qué significa "**temperatura**" en la regla del domingo? ¿Se refiere a una temporada, por ejemplo verano, con otras reglas o precios?
+1. ~~**Diario, interdiario, domingos y feriados.**~~ ✅ **Confirmado.** Ver secciones 2.5 y 2.6.
 2. **2x1 con dos cuentas.** ¿Las dos personas deben inscribirse el **mismo día**? ¿Deben tener el **mismo plan y la misma fecha de vencimiento**? ¿Si uno congela, el otro también? ¿Se puede cambiar de acompañante?
 3. **Umbral de vencimiento.** ¿Con cuántos días de anticipación avisar (3, 5, 7)? ¿Hay **días de tolerancia** después de vencer? ¿Se puede renovar antes y que los días se sumen?
 4. **Pase diario.** ¿Precio? ¿Vale para **cualquier sede**? ¿Se vende solo en recepción o también en la app? ¿Se pide DNI / registro completo o solo nombre? ¿Vale para el día calendario o por 24 horas?
