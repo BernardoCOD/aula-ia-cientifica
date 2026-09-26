@@ -241,7 +241,7 @@ erDiagram
 
     ENTRADAS_DIA {
         uuid id PK
-        text dni "TEMPORAL: se borra a los 30 días"
+        text dni "TEMPORAL: se borra a los 15 días"
         uuid perfil_id FK "si el DNI es de un socio"
         uuid sede_id FK
         numeric monto "S/ 10"
@@ -333,7 +333,7 @@ Reglas clave:
 - **Consentimiento informado:** casilla obligatoria **no marcada por defecto** al registrarse, con enlace a la *Política de Privacidad*. Guardar la fecha (`acepta_datos_fecha`).
 - **Marketing aparte:** casilla **separada y opcional** (`acepta_marketing`) para recibir avisos de promociones. **Las alertas de promociones (sección 4.5) solo se envían a quienes la marcaron.** Las alertas sobre su propio plan (vencimiento, ingresos) sí se envían a todos, porque son parte del servicio.
 - **Finalidad:** solo pedir los datos necesarios (DNI, nombre, celular, fecha de nacimiento). No pedir datos de salud salvo que sea indispensable; si se piden (lesiones), son **datos sensibles** y requieren consentimiento expreso por escrito.
-- **Entrada del día (DNI temporal):** a quien paga S/ 10 sin tener cuenta solo se le pide el **número de DNI**, y se **borra automáticamente a los 30 días**. El monto se conserva para la caja. En recepción debe haber un aviso visible que lo explique.
+- **Entrada del día (DNI temporal):** a quien paga S/ 10 sin tener cuenta solo se le pide el **número de DNI**, y sus datos se **borran automáticamente a los 15 días**. Solo quedan el monto, la fecha y la sede, sin datos personales, para cuadrar la caja. En recepción debe haber un aviso visible que lo explique.
 - **Derechos ARCO:** pantalla o correo para que el socio pida **A**cceso, **R**ectificación, **C**ancelación u **O**posición.
 - **Banco de datos:** el gimnasio debe **inscribir su banco de datos** de socios ante la Autoridad Nacional de Protección de Datos Personales (MINJUSDH).
 - **Seguridad:** contraseñas gestionadas por Supabase Auth, HTTPS, RLS y vouchers en un *bucket* **privado** (se ven con enlaces temporales).
@@ -380,7 +380,7 @@ El gimnasio **abre los domingos y feriados**, pero esos días **ningún plan es 
 - **¿Quién la puede usar?** Cualquier persona que no tenga plan vigente, y **todos** los domingos y feriados.
 - **Sedes:** se puede usar en **cualquiera de las 2 sedes**.
 - **¿Dónde se vende?** **Solo en recepción.** No se vende en la app.
-- **¿Qué datos se piden?** Solo el **número de DNI**, en un área **temporal** (tabla `entradas_dia`) que **no crea cuenta** y se borra a los 30 días. Si el DNI ya pertenece a un socio registrado, se enlaza con su perfil para su historial.
+- **¿Qué datos se piden?** Solo el **número de DNI**, en un área **temporal** (tabla `entradas_dia`) que **no crea cuenta**. Sus datos se borran a los 15 días. Si el DNI ya pertenece a un socio registrado, se enlaza con su perfil para su historial.
 - **Mismo día:** si ese DNI ya pagó hoy, recepción ve *"Ya pagó su entrada hoy"* y no se cobra dos veces.
 
 **Otras reglas:**
@@ -415,7 +415,7 @@ Cada socio con plan tiene un **color** según lo que le queda. Se ve en el escá
 - **Ver su plan** abre la ficha del socio con su plan actual, lo que le queda, su historial y las **promociones vigentes para recomendarle**. Desde ahí la recepción puede registrarle la renovación en el mostrador.
 - **No va a renovar:** el personal lo marca (con confirmación) y **se dejan de enviar alertas al dueño y a la recepción sobre ese plan**. Queda registrado quién lo marcó y cuándo, y se puede deshacer. **El socio sigue recibiendo sus propias alertas.**
 - **Si el socio ya renovó** (tiene un plan `programada`), no se envía ninguna alerta de "por dejar la familia".
-- Las alertas del personal llegan al **dueño** y a la **recepción de la sede principal del socio**.
+- Las alertas del personal llegan al **dueño** y a la **recepción de la sede donde está inscrito el socio** (`sede_principal_id`). La recepción de la otra sede no las recibe.
 
 Tipos en la tabla `alertas`: `socio_quedan_3`, `socio_queda_1`, `socio_plan_terminado`, `personal_socio_por_irse`, `personal_ultimo_dia`, `promo_por_terminar`, `pago_aprobado`, `pago_rechazado`.
 
@@ -557,7 +557,7 @@ Reglas:
 2. **Activar planes programados:** los que tenían que empezar hoy pasan a `activa` con sus fechas calculadas.
 3. **Alertas de vencimiento:** recalcula "lo que le queda" a cada socio y envía las alertas de 3, 2 y 1 de la sección 2.7. No envía alertas al personal si el plan está marcado "no va a renovar" o si el socio ya tiene un plan programado. Nunca envía la misma alerta dos veces.
 4. **Promociones por terminar:** ver 4.5, paso 5.
-5. **Borrar DNI temporales:** anonimiza los `entradas_dia` con más de 30 días.
+5. **Borrar datos temporales:** en las `entradas_dia` con más de 15 días borra el DNI y el enlace al perfil. Solo quedan el monto, la fecha y la sede.
 6. **Enviar push** de todas las alertas nuevas a los celulares registrados.
 
 ### 4.5 Publicar una promoción (afiche)
@@ -583,7 +583,7 @@ Hoy el dueño y la recepción publican los afiches como **estado de WhatsApp**, 
    - Si ese DNI ya pagó hoy → *"Ya pagó su entrada hoy"*.
 4. Se cobra S/ 10 (efectivo, Yape o Plin) → se guarda en `entradas_dia` → ✅ PUEDE PASAR.
 5. **Cortesía** (monto 0) solo de lunes a sábado que no sea feriado.
-6. El DNI se borra automáticamente a los 30 días; el monto queda en la caja.
+6. Los datos (DNI) se borran automáticamente a los 15 días; el monto queda en la caja.
 
 ---
 
@@ -702,7 +702,7 @@ urban-force-gym/
 48. Alertas al personal "Socio por dejar la familia URBAN FORCE" (3, 2 y 1) + lista + ficha del socio.
 49. Botón "No va a renovar" (detiene las alertas al personal, con auditoría y opción de deshacer).
 50. Alerta de promoción "¡Últimos 2 días!" (en la app y push, solo con consentimiento).
-51. Borrado automático de DNI temporales a los 30 días.
+51. Borrado automático de los datos de las entradas del día a los 15 días.
 
 ### Fase 8 — Reportes
 52. Dashboard del admin.
@@ -802,10 +802,11 @@ Fuentes: [Riqra](https://blog.riqra.com/posts/pasarelas-pago-online-peru), [Culq
 5. **Renovación anticipada:** el nuevo plan empieza cuando termina el actual (sección 2.8).
 6. **Entrada del día:** S/ 10, solo en recepción, solo con DNI temporal, vale en las 2 sedes (sección 2.6).
 
+7. **Semáforo:** verde = más de 5, amarillo = 5 o menos, rojo = 1 (sección 2.7).
+8. **Datos de la entrada del día:** se borran a los **15 días** (sección 2.6).
+9. **Alertas al personal:** llegan al dueño y a la recepción de la **sede donde está inscrito el socio** (sección 2.7).
+
 **Pendiente ❓**
-7. **Color verde:** mencionaste "más de 20 asistencias por completar" para el verde y "5" para el amarillo. En el plan dejé **verde = más de 5**, para que no quede un hueco entre 6 y 20. ¿Está bien?
-8. **DNI temporal:** ¿30 días es buen tiempo antes de borrarlo, o prefieres otro plazo?
-9. **Alertas al personal:** ¿deben llegar a la recepción de la **sede principal del socio** (propuesta actual) o a la recepción de **las 2 sedes**?
 10. **Sedes:** ¿todos los planes permiten entrar a las 2 sedes? ¿Los precios son iguales en ambas?
 11. **Congelamiento:** ¿se permite congelar (viajes, lesiones)? ¿Cuántos días como máximo?
 12. **Horarios:** ¿hay planes con horario restringido (por ejemplo, solo mañanas)?
