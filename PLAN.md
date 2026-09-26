@@ -14,7 +14,7 @@
 | Estilos | **Tailwind CSS** con los colores de la marca (negro, amarillo dorado, blanco) |
 | Base de datos, login y archivos | **Supabase** (PostgreSQL + Auth + Storage) |
 | Hosting | **Vercel** |
-| Pagos v1 | **Yape al número del dueño** + foto del voucher, aprobado por el dueño · efectivo en recepción (0 % de comisión) |
+| Pagos v1 | **Yape al número del dueño** + foto del voucher, aprobado por el dueño o la recepción · efectivo en recepción (0 % de comisión) |
 | Pagos v2 | Pasarela **Izipay** (Yape + Plin + tarjetas). Alternativa: **Culqi** |
 | Asistencia | **Código QR** personal del socio, escaneado en recepción, con **semáforo** verde / amarillo / rojo |
 | Promociones | **Afiches (imágenes)** que suben el dueño y la recepción, iguales para las 2 sedes. Al tocarlos se va a pagar ese plan |
@@ -45,14 +45,14 @@
 - **Lo que haremos:** definir los colores de la marca una sola vez en la configuración y usarlos en toda la app.
 
 **Colores de marca (confirmados: amarillo y negro, medidos en el logo oficial):**
-El logo oficial es un **hexágono amarillo con borde negro**, con el espartano "UF" y el texto **URBAN FORCE GYM**. Está guardado en `recursos/urban-force-logo.jpg`. Los colores se midieron directamente en la imagen:
+El logo oficial es un **hexágono amarillo con borde negro**, con el espartano "UF" y el texto **URBAN FORCE GYM**. Está guardado en `recursos/urban-force-logo.jpg` (recorte original) y en `recursos/urban-force-logo-hd.png` (ampliado 4 veces, 852 × 952 px, **mismo diseño**). Los colores se midieron directamente en la imagen:
 
 | Nombre | Uso | Valor |
 |---|---|---|
 | `marca-negro` | Fondos, barra superior, textos sobre amarillo | `#0A0A0A` (medido) |
 | `marca-amarillo` | Botones principales, resaltados | `#F0B400` (medido) |
 | `marca-amarillo-oscuro` | Botón presionado, bordes | `#C79500` (derivado) |
-| `marca-blanco` | Textos sobre negro | `#FFFFFF` |
+| `marca-blanco` | Textos sobre negro (en el logo, la palabra "FORCE") | `#FFFFFF` |
 | `gris-suave` | Textos secundarios | `#A3A3A3` |
 
 Colores del **semáforo** (sección 2.7), separados de la marca para que no se confundan con el dorado:
@@ -63,7 +63,7 @@ Colores del **semáforo** (sección 2.7), separados de la marca para que no se c
 | `semaforo-amarillo` | `#FACC15` (con texto negro) |
 | `semaforo-rojo` | `#DC2626` |
 
-➡️ **Tarea (Fase 0):** pedir al dueño el logo en **alta calidad** (PNG con fondo transparente o SVG). La imagen actual mide solo 213 × 238 px y se vería borrosa como ícono de la app (se necesitan 192 y 512 px).
+➡️ **Logo:** la versión HD sirve para la app y para los íconos de 192 y 512 px. La ampliación suaviza los bordes, pero no puede recuperar el detalle que se perdió al recortarlo de WhatsApp. Si más adelante se quiere un logo perfecto para imprimir, conviene **redibujarlo en vector (SVG) copiando exactamente el diseño**, sin cambiar nada.
 ➡️ Revisar el **contraste** (texto negro sobre dorado sí se lee; texto blanco sobre dorado **no**).
 ➡️ El semáforo **siempre** lleva también texto e ícono, no solo color, para personas con daltonismo. Como el amarillo del semáforo se parece al amarillo de la marca, el semáforo ocupa **toda la pantalla** para que no se confunda con un botón.
 
@@ -173,12 +173,13 @@ erDiagram
     }
 
     APODERADOS {
-        uuid perfil_id PK "el socio menor de edad"
+        uuid perfil_id PK "el socio menor de edad (12 a 17)"
         text nombres
         text dni
         text parentesco "padre, madre, tutor, familiar"
         text celular
-        timestamptz acepta_datos_fecha "consentimiento del apoderado"
+        timestamptz autorizado_en "autoriza bajo su responsabilidad"
+        uuid verificado_por FK "recepcionista que vio su DNI"
     }
 
     PERSONAL_SEDE {
@@ -340,7 +341,7 @@ erDiagram
 | planes | Leer activos | Leer | Leer | CRUD |
 | promociones | Leer vigentes (también sin sesión) | **CRUD** (son iguales para las 2 sedes) | Leer | CRUD |
 | suscripciones | Solo las suyas | Ver/crear en su sede, marcar "no va a renovar" | Ver estado | Todo |
-| pagos | Ver los suyos, subir voucher | Registrar **efectivo** en su sede | ❌ | Todo, incluida la **aprobación de pagos por Yape** |
+| pagos | Ver los suyos, subir voucher | Registrar **efectivo** y **aprobar/rechazar Yape** de socios de su sede | ❌ | Todo |
 | asistencias | Ver las suyas | Registrar en su sede | Ver de su sede | Todo |
 | entradas_dia | ❌ | Crear y ver **solo de su sede** | ❌ | Todo |
 | alertas | Solo las suyas | Solo las suyas | Solo las suyas | Solo las suyas |
@@ -357,7 +358,7 @@ Reglas clave:
 ### 2.4 Ley N.º 29733 – Protección de Datos Personales (Perú)
 - **Consentimiento informado:** casilla obligatoria **no marcada por defecto** al registrarse, con enlace a la *Política de Privacidad*. Guardar la fecha (`acepta_datos_fecha`).
 - **Marketing aparte:** casilla **separada y opcional** (`acepta_marketing`) para recibir avisos de promociones. **Las alertas de promociones (sección 4.5) solo se envían a quienes la marcaron.** Las alertas sobre su propio plan (vencimiento, ingresos) sí se envían a todos, porque son parte del servicio.
-- **Menores de edad:** si el socio tiene **menos de 14 años**, el consentimiento lo da su padre, madre o tutor (Ley 29733). La app lo pide en el registro (sección 2.10).
+- **Menores de edad:** si el socio tiene **menos de 14 años** (el gimnasio acepta desde los 12), el consentimiento de datos lo da su padre, madre o tutor (Ley 29733). La autorización se registra en recepción (sección 2.10).
 - **Finalidad:** solo pedir los datos necesarios (DNI, nombre, celular, correo, fecha de nacimiento). No pedir datos de salud salvo que sea indispensable; si se piden (lesiones), son **datos sensibles** y requieren consentimiento expreso por escrito.
 - **Entrada del día (DNI temporal):** a quien paga S/ 10 sin tener cuenta solo se le pide el **número de DNI**, y sus datos se **borran automáticamente a los 15 días**. Solo quedan el monto, la fecha y la sede, sin datos personales, para cuadrar la caja. En recepción debe haber un aviso visible que lo explique.
 - **Derechos ARCO:** pantalla o correo para que el socio pida **A**cceso, **R**ectificación, **C**ancelación u **O**posición.
@@ -407,6 +408,7 @@ El gimnasio **abre los domingos y feriados**, pero esos días **ningún plan es 
 
 **Entrada del día (antes llamada "pase diario"):**
 - **Precio:** S/ 10, configurable por el admin.
+- **Incluye:** máquinas **y aeróbicos**.
 - **¿Quién la puede usar?** Cualquier persona que no tenga plan vigente, y **todos** los domingos y feriados.
 - **Sedes:** se puede usar en **cualquiera de las 2 sedes**.
 - **¿Dónde se vende?** **Solo en recepción.** No se vende en la app.
@@ -501,20 +503,26 @@ Los precios son **los mismos** para las dos sedes. Se mostrarán en los **afiche
 | 1 mes – máquinas y aeróbicos | S/ 130 | S/ 90 (12 ingresos) |
 | 2 meses – máquinas y aeróbicos | S/ 190 | S/ 150 (24 ingresos) |
 | 3 meses – máquinas y aeróbicos | S/ 250 | S/ 190 (36 ingresos) |
-| **2 personas – 1 mes** | S/ 190 (las dos) | S/ 150 (las dos, 12 ingresos cada una) |
-| **Promoción** | **3 meses + 15 días: S/ 249** | **3 meses + 1 semana: S/ 189** (39 ingresos) |
+| **2 personas – 1 mes** (máquinas y aeróbicos) | S/ 190 (las dos) | S/ 150 (las dos, 12 ingresos cada una) |
+| **Promoción** (máquinas y aeróbicos) | **3 meses + 15 días: S/ 249** | **3 meses + 1 semana: S/ 189** (39 ingresos) |
 
 Estos precios se cargan en `seed.sql` como datos iniciales. Cuando cambien, el dueño los actualiza desde la app (plan + afiche).
 
 **Plan de 2 personas:**
 - Es **un solo pago** para **dos socios**, y cada uno tiene **su propia cuenta, su QR y su control de ingresos**.
 - Quien compra escribe el **DNI de la otra persona**. Si esa persona no tiene cuenta, recibe una invitación para registrarse y aceptar la Ley 29733 ella misma, porque no se puede registrar a otra persona sin su consentimiento.
-- Las dos suscripciones quedan enlazadas (`compra_duo_id`) y empiezan el mismo día.
-- Faltan detalles por confirmar (sección 8).
+- Incluye **máquinas y aeróbicos**.
+- Las dos personas deben estar inscritas en la **misma sede**. Si la segunda ya es socio de la otra sede, no se puede comprar el plan.
+- Las dos suscripciones quedan enlazadas (`compra_duo_id`) y **empiezan el mismo día**.
+- Si la segunda persona **ya es socio con plan activo**, el plan de 2 personas queda `programada` para **las dos** y empieza cuando termine el plan actual de esa persona. Si las dos tienen plan activo, empieza cuando termine el **último** de los dos. La app lo avisa antes de pagar: *"Su plan de 2 personas empezará el 15 de noviembre."*
+- Si la segunda persona ya es socio **sin plan activo**, o si es nueva, el plan empieza de inmediato.
 
 ### 2.10 Menores de edad, devoluciones y reclamos (confirmado)
-- **Menores de edad:** solo pueden entrenar **acompañados** por su padre, madre, tutor o un familiar **mayor de edad**.
-  - En el registro, si la fecha de nacimiento indica menos de 18 años, la app pide los **datos del apoderado** (tabla `apoderados`). Si el menor tiene menos de 14 años, el apoderado es quien da el consentimiento de datos.
+- **Menores de edad:** se aceptan **desde los 12 años**. Solo pueden entrenar **acompañados** por su padre, madre, tutor o un familiar **mayor de edad**.
+  - **Menos de 12 años:** la app **no permite** el registro.
+  - **De 12 a 17 años:** la app pide los **datos del apoderado** (tabla `apoderados`). La cuenta queda **"pendiente de autorización"**: el menor todavía no puede comprar planes ni entrar.
+  - **Autorización en recepción:** el padre o apoderado va a la sede con su DNI. Recepción verifica su identidad y el apoderado acepta en pantalla: *"Autorizo que mi hijo(a) entrene en URBAN FORCE bajo mi responsabilidad y me comprometo a acompañarlo."* Se guarda quién autorizó, la fecha y qué recepcionista lo verificó. Si el menor tiene menos de 14 años, en ese mismo paso el apoderado da el consentimiento de datos (Ley 29733).
+  - **Pago:** lo puede hacer **el mismo menor** con su dinero, una vez que su cuenta está autorizada.
   - Al escanear el QR de un menor, recepción ve la etiqueta **"MENOR DE EDAD — debe ingresar acompañado de un adulto"**.
 - **Devoluciones:** **no hay devoluciones.** Antes de pagar, el socio debe marcar *"Entiendo que no hay devoluciones ni congelamiento"*. También aparece en los Términos. El Código de Protección y Defensa del Consumidor exige informarlo de forma clara **antes** de la compra.
 - **Libro de Reclamaciones:** todo negocio en Perú que vende al público debe tenerlo. Como la app vende planes, tendrá un **Libro de Reclamaciones virtual** (formulario + copia al correo del socio + aviso al dueño).
@@ -552,6 +560,8 @@ Estos precios se cargan en `seed.sql` como datos iniciales. Cuando cambien, el d
 4. **Socios por dejar la familia:** lista de alertas amarillas y rojas de su sede, con **Ver su plan** y **No va a renovar**.
 5. **Ficha del socio:** plan, lo que le queda, historial, promociones para recomendarle y **Renovar en mostrador**.
 6. **Cobro en efectivo** de planes en el mostrador (se aprueba al momento y se envía la boleta al correo).
+6b. **Pagos por Yape pendientes** de socios de su sede: **Aprobar** / **Rechazar** con la foto del voucher. Solo debe aprobar si puede confirmar que el dinero llegó al Yape del dueño.
+6c. **Autorizar menor de edad:** verificar el DNI del apoderado y registrar su autorización.
 7. **Registrar socio nuevo** en mostrador.
 8. **Promociones:** subir afiches (ver 3.5).
 9. **Asistencias de hoy** de su sede.
@@ -565,7 +575,7 @@ Estos precios se cargan en `seed.sql` como datos iniciales. Cuando cambien, el d
 ### 3.5 Administrador (dueño)
 1. **Dashboard:** ingresos del mes, socios activos, 🟡/🔴 por vencer, "no va a renovar", nuevos, entradas del día; comparación Sede A vs Sede B.
 2. **Planes:** crear (modalidad, acceso, meses, días extra, 1 o 2 personas → cupo automático), editar precio, activar/desactivar.
-2b. **Pagos por Yape pendientes:** como el Yape es del dueño, él revisa en **su** app de Yape que el dinero llegó y aprueba o rechaza. Recibe una notificación push por cada pago nuevo.
+2b. **Pagos por Yape pendientes** de las 2 sedes: el dueño revisa en **su** app de Yape que el dinero llegó y aprueba o rechaza. Recibe una notificación push por cada pago nuevo.
 3. **Promociones** (también la recepción):
    - **subir varios afiches a la vez**, que se comprimen solos
    - para cada uno elegir **temporal** (fecha de fin) o **permanente**
@@ -590,7 +600,7 @@ sequenceDiagram
     actor S as Socio
     participant App
     participant BD as Supabase
-    actor D as Dueño
+    actor D as Dueño o recepción
     S->>App: Toca un afiche en "Planes y precios"
     App->>App: ¿Tiene sesión? Si no, registro/login y vuelve aquí
     App->>BD: ¿Tiene un plan activo?
@@ -601,7 +611,7 @@ sequenceDiagram
     S->>App: Sube foto del voucher + código de operación
     App->>BD: Crea pago "pendiente" (voucher en bucket privado)
     BD-->>D: Push "Nuevo pago por Yape: S/ 110 — Juan Pérez"
-    D->>D: Revisa en SU app de Yape que el dinero llegó
+    D->>D: Confirma que el dinero llegó al Yape del dueño
     alt Coincide
         D->>App: Aprobar
         App->>BD: Transacción: pago aprobado + suscripción activa o programada + auditoría
@@ -616,6 +626,8 @@ Reglas:
 - El `codigo_operacion` no se puede repetir.
 - El monto del voucher debe ser igual al `precio_final`.
 - El precio que se cobra sale **del servidor** (del afiche o del plan), nunca del navegador.
+- **Quién aprueba:** el dueño (todas las sedes) o la recepción de la sede del socio. El primero que lo resuelve lo cierra y queda en auditoría quién fue.
+  - ⚠️ La recepción no ve el Yape del dueño. Necesita una forma de confirmar que el dinero llegó; por ejemplo, que el dueño active en su Yape las notificaciones compartidas o reenvíe los avisos al celular de recepción. Si no puede confirmarlo, debe dejarlo para el dueño.
 - Los clientes que usan **Plin** también pueden pagar al número de Yape del dueño (las billeteras son interoperables).
 - **Pago en efectivo** en recepción: se aprueba al momento, sin voucher, y la boleta se envía igual al correo.
 
@@ -728,7 +740,7 @@ urban-force-gym/
 
 ### Fase 0 — Preparación
 1. Confirmar las dudas pendientes de la sección 8 con el dueño.
-2. Pedir el logo en alta calidad (PNG transparente o SVG).
+2. Preparar los íconos de la app (192 y 512 px) a partir del logo HD, sin cambiar el diseño.
 3. Crear cuentas: GitHub, Supabase, Vercel.
 4. Crear el proyecto Next.js + TypeScript + Tailwind.
 5. Configurar colores de marca (`#0A0A0A`, `#F0B400`), colores del semáforo y fuente en Tailwind.
@@ -742,11 +754,11 @@ urban-force-gym/
 11. Funciones `mi_rol()` y `trabajo_en_sede()`.
 12. Políticas RLS tabla por tabla.
 13. `seed.sql` con las 2 sedes, **los 16 planes y precios de la sección 2.9**, afiches de ejemplo y un usuario de cada rol.
-14. **Pruebas de RLS:** un socio no ve a otro; recepción de Sede A no ve cobros ni entradas de Sede B; solo el dueño aprueba pagos por Yape.
+14. **Pruebas de RLS:** un socio no ve a otro; recepción de Sede A no ve cobros ni entradas de Sede B; recepción solo aprueba pagos por Yape de socios de su sede.
 
 ### Fase 2 — Autenticación y roles
 15. Registro con correo, consentimiento Ley 29733 y casilla de promociones.
-16. Registro de menores: datos del apoderado y consentimiento del apoderado si es menor de 14.
+16. Registro de menores: edad mínima 12, datos del apoderado, cuenta "pendiente de autorización" y pantalla de autorización en recepción.
 17. Login, logout, recuperar contraseña.
 18. Redirección según rol después del login (y **volver al afiche** si venía de uno).
 19. Protección de rutas (un socio no entra a `/admin`) y barra de navegación inferior según rol.
@@ -768,7 +780,7 @@ urban-force-gym/
 29. Crear suscripción `pendiente_pago` con precio fijado desde el servidor.
 30. Pantalla de pago: Yape del dueño + voucher al bucket privado + casilla "no hay devoluciones".
 31. Plan de 2 personas: DNI de la segunda persona, invitación y dos suscripciones enlazadas.
-32. Pagos por Yape pendientes para el dueño (con push por cada pago nuevo).
+32. Pagos por Yape pendientes para el dueño y la recepción (con push por cada pago nuevo).
 33. Función SQL "aprobar pago" → `activa` o `programada` (transacción + auditoría); rechazar con motivo.
 34. Cobro en efectivo en recepción.
 35. Aviso "Tu nuevo plan empezará el…" cuando ya tiene plan activo.
@@ -803,7 +815,7 @@ urban-force-gym/
 58. Reportes + exportar CSV.
 
 ### Fase 9 — PWA y pulido
-59. `manifest`, íconos (a partir del logo en alta calidad) y *service worker* (también recibe los push).
+59. `manifest`, íconos (a partir de `recursos/urban-force-logo-hd.png`) y *service worker* (también recibe los push).
 60. Pantalla "Cómo instalar y activar avisos" (Android / iPhone).
 61. Pruebas en celulares reales (Android de gama baja + iPhone con la app instalada).
 62. Política de privacidad y Términos (sin devoluciones ni congelamiento).
@@ -910,7 +922,7 @@ Fuentes: [Riqra](https://blog.riqra.com/posts/pasarelas-pago-online-peru), [Culq
 10. **Planes y precios:** 16 planes, iguales en las 2 sedes (sección 2.9).
 11. **Congelamiento:** no hay (sección 2.5).
 12. **Horarios:** lunes a sábado 6:00 a. m.–10:30 p. m., domingo 8:00 a. m.–3:00 p. m., feriados variable (sección 2.6).
-13. **Menores de edad:** solo acompañados por un adulto de su familia o tutor (sección 2.10).
+13. **Menores de edad:** desde 12 años, acompañados y autorizados por su padre o apoderado en recepción; el menor puede pagar (sección 2.10).
 14. **Boletas:** electrónicas, enviadas al correo del socio (sección 7.6).
 15. **Yape:** al número del dueño (sección 4.1).
 16. **Colores:** amarillo `#F0B400` y negro `#0A0A0A`, medidos en el logo oficial (sección 1.3).
@@ -918,19 +930,15 @@ Fuentes: [Riqra](https://blog.riqra.com/posts/pasarelas-pago-online-peru), [Culq
 18. **Sede 2:** Amauta, Asociación Leonardo Toribio de la Laguna Azul, Ate Vitarte, frente al Mercado La Huaca (sección 2.9).
 19. **Uso de sedes:** el plan solo vale en la sede donde se inscribió el socio (sección 2.9).
 
+20. **Plan de 2 personas:** máquinas y aeróbicos, misma sede, empiezan el mismo día; si uno ya tiene plan, se espera a que termine (sección 2.9).
+21. **Promociones S/ 249 y S/ 189:** máquinas y aeróbicos (sección 2.9).
+22. **Entrada del día:** incluye aeróbicos (sección 2.6).
+23. **Pagos por Yape:** los puede aprobar el dueño o la recepción (sección 4.1).
+24. **Logo:** es la imagen enviada; se amplió sin cambiar el diseño (sección 1.3).
+
 **Pendiente ❓**
-20. **Plan de 2 personas:**
-    - ¿Es **solo máquinas** o **máquinas y aeróbicos**?
-    - ¿Las dos personas deben empezar el mismo día?
-    - ¿La segunda persona debe ser alguien nuevo o puede ser un socio que ya tenía plan?
-    - ¿Las dos personas deben inscribirse en la **misma sede**?
-21. **Promociones "3 meses + 15 días" (S/ 249) y "3 meses + 1 semana" (S/ 189):** ¿son **solo máquinas** o **máquinas y aeróbicos**?
-22. **Entrada del día (S/ 10):** ¿incluye aeróbicos o solo máquinas?
-23. **Aprobación de pagos por Yape:** como el dinero llega al celular del dueño, la propuesta es que **el dueño los apruebe** desde la app. ¿Está bien, o la recepción también debe poder aprobarlos?
-24. **RUC:** para emitir boletas electrónicas se necesita RUC. ¿El gimnasio tiene RUC? ¿A nombre de quién está?
-25. **Menores de edad:** ¿hay una **edad mínima**? ¿El adulto que lo acompaña debe ser socio o pagar su entrada?
-26. **Logo en alta calidad:** ¿el dueño tiene el logo en PNG transparente o en SVG?
+25. **Número de RUC y a quién pertenece:** el gimnasio tiene RUC, pero falta el número. **No bloquea el inicio:** solo se necesita en la Fase 8, para activar las boletas electrónicas.
 
 ---
 
-*Fin del plan. Siguiente paso: resolver las dudas pendientes de la sección 8 y empezar la Fase 0.*
+*Fin del plan. Todas las reglas del negocio están confirmadas; solo falta el número de RUC, que se necesita recién en la Fase 8. Siguiente paso: empezar la Fase 0.*
