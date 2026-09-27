@@ -741,10 +741,10 @@ urban-force-gym/
 ### Fase 0 — Preparación
 1. ✅ Confirmar las dudas de la sección 8 con el dueño (solo falta el número de RUC, que se necesita en la Fase 8).
 2. ✅ Preparar los íconos de la app (192 y 512 px, *maskable*, iPhone y favicon) a partir del logo, sin cambiar el diseño.
-3. ⏳ Crear cuentas: GitHub ✅, Supabase ⏳, Vercel ⏳.
+3. ⏳ Crear cuentas: GitHub ✅, Vercel ✅, Supabase ⏳.
 4. ✅ Crear el proyecto Next.js 16 + TypeScript + Tailwind 4 (con pnpm).
 5. ✅ Configurar colores de marca (`#0A0A0A`, `#F0B400`), colores del semáforo y fuentes (Oswald para títulos, Inter para textos).
-6. ⏳ Publicar el "Hola URBAN FORCE" en Vercel (la página ya está lista; falta conectar Vercel al repositorio).
+6. ✅ Publicar el "Hola URBAN FORCE" en Vercel (funciona en computadora y celular; `vercel.json` fija el preset de Next.js).
 
 ### Fase 1 — Base de datos y seguridad
 7. Migración: `sedes` (con horarios y mapa), `perfiles`, `apoderados`, `personal_sede`.
