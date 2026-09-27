@@ -195,7 +195,7 @@ erDiagram
         int duracion_meses "1, 2, 3"
         int dias_extra "promociones: 15 = +15 días, 7 = +1 semana"
         int personas "1, o 2 en el plan de 2 personas"
-        int ingresos_por_mes "interdiario = 12, diario = null"
+        int ingresos_totales "calculado: interdiario 12 x meses + 3 x semana extra"
         numeric precio_base
         boolean activo
     }
@@ -203,7 +203,7 @@ erDiagram
     PROMOCIONES {
         uuid id PK
         text titulo "texto alternativo del afiche"
-        text imagen_url "afiche en Storage (bucket público)"
+        text imagen_path "afiche en Storage (bucket publico)"
         uuid plan_id FK "plan que se compra al tocarlo (opcional)"
         numeric precio "lo que se cobra; debe coincidir con el afiche"
         date vigente_desde
@@ -303,6 +303,14 @@ erDiagram
         text p256dh
         text auth
         timestamptz creado_en
+    }
+
+    CONFIGURACION {
+        boolean id PK "una sola fila"
+        text yape_numero "número del dueño"
+        text yape_qr_path
+        numeric precio_entrada_dia "10"
+        int dias_borrado_entradas "15"
     }
 
     AUDITORIA {
@@ -741,20 +749,21 @@ urban-force-gym/
 ### Fase 0 — Preparación
 1. ✅ Confirmar las dudas de la sección 8 con el dueño (solo falta el número de RUC, que se necesita en la Fase 8).
 2. ✅ Preparar los íconos de la app (192 y 512 px, *maskable*, iPhone y favicon) a partir del logo, sin cambiar el diseño.
-3. ⏳ Crear cuentas: GitHub ✅, Vercel ✅, Supabase ⏳.
+3. ✅ Crear cuentas: GitHub, Vercel y Supabase (proyecto `urban-force-gym`).
 4. ✅ Crear el proyecto Next.js 16 + TypeScript + Tailwind 4 (con pnpm).
 5. ✅ Configurar colores de marca (`#0A0A0A`, `#F0B400`), colores del semáforo y fuentes (Oswald para títulos, Inter para textos).
 6. ✅ Publicar el "Hola URBAN FORCE" en Vercel (funciona en computadora y celular; `vercel.json` fija el preset de Next.js).
 
 ### Fase 1 — Base de datos y seguridad
-7. Migración: `sedes` (con horarios y mapa), `perfiles`, `apoderados`, `personal_sede`.
-8. Migración: `planes` (modalidad, acceso, meses, días extra, personas), `promociones`.
-9. Migración: `suscripciones`, `pagos` (con boleta), `asistencias`.
-10. Migración: `entradas_dia`, `feriados`, `alertas`, `dispositivos_push`, `auditoria`.
-11. Funciones `mi_rol()` y `trabajo_en_sede()`.
-12. Políticas RLS tabla por tabla.
-13. `seed.sql` con las 2 sedes, **los 16 planes y precios de la sección 2.9**, afiches de ejemplo y un usuario de cada rol.
-14. **Pruebas de RLS:** un socio no ve a otro; recepción de Sede A no ve cobros ni entradas de Sede B; recepción solo aprueba pagos por Yape de socios de su sede.
+7. ✅ Migración: `sedes` (con horarios y mapa), `perfiles`, `apoderados`, `personal_sede`.
+8. ✅ Migración: `planes` (modalidad, acceso, meses, días extra, personas; el cupo se calcula solo), `promociones`.
+9. ✅ Migración: `suscripciones`, `pagos` (con boleta), `asistencias`.
+10. ✅ Migración: `entradas_dia`, `feriados`, `alertas`, `dispositivos_push`, `configuracion`, `auditoria`.
+11. ✅ Funciones `mi_rol()`, `trabajo_en_sede()` y otras, en el esquema `privado` (no expuesto en la API).
+12. ✅ Políticas RLS tabla por tabla + buckets `vouchers` (privado) y `publico`.
+13. ✅ `seed.sql` con las 2 sedes, los 16 planes y precios, la configuración y los feriados de 2026. Los usuarios de prueba de cada rol están en `tests/bd/` (no en producción). Los afiches reales se suben en la Fase 4.
+14. ✅ **Pruebas de RLS:** `pnpm test:bd` ejecuta 60 pruebas en un PostgreSQL local.
+15. ⏳ Pegar `supabase/instalar-todo.sql` en el SQL Editor de Supabase (lo hace el usuario).
 
 ### Fase 2 — Autenticación y roles
 15. Registro con correo, consentimiento Ley 29733 y casilla de promociones.
