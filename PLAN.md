@@ -702,11 +702,12 @@ Hoy el dueño y la recepción publican los afiches como **estado de WhatsApp**, 
 ```
 urban-force-gym/
 ├── app/                          # Pantallas (App Router de Next.js)
-│   ├── (publico)/                # Inicio con afiches, registro, login, privacidad, términos, libro de reclamaciones, cómo instalar
-│   ├── (socio)/                  # mi-membresia, mi-qr, planes-y-precios, pagar, pagos, asistencias, notificaciones, perfil
-│   ├── (recepcion)/              # escanear, entrada-del-dia, socios-por-irse, ficha, cobro-efectivo, promociones, caja
-│   ├── (entrenador)/             # presentes, socios
-│   ├── (admin)/                  # dashboard, pagos-yape, planes, promociones, socios-por-irse, personal, sedes, feriados, reportes, auditoria, configuracion
+│   ├── (acceso)/                 # ingresar, registro, recuperar, restablecer
+│   ├── privacidad/ ...           # Páginas públicas: privacidad y términos, libro de reclamaciones, cómo instalar
+│   ├── socio/                    # /socio: mi-membresia, mi-qr, planes-y-precios, pagar, pagos, asistencias, notificaciones, perfil
+│   ├── recepcion/                # /recepcion: escanear, entrada-del-dia, autorizaciones, socios-por-irse, ficha, cobro-efectivo, promociones, caja
+│   ├── entrenador/               # /entrenador: presentes, socios
+│   ├── admin/                    # /admin: dashboard, pagos-yape, planes, promociones, socios-por-irse, personal, sedes, feriados, reportes, auditoria, configuracion
 │   ├── api/
 │   │   ├── webhooks/pasarela/    # Recibe avisos de Izipay/Culqi (v2)
 │   │   ├── push/suscribir/       # Guarda el celular del usuario para push
@@ -766,11 +767,13 @@ urban-force-gym/
 15. ⏳ Pegar `supabase/instalar-todo.sql` en el SQL Editor de Supabase (lo hace el usuario).
 
 ### Fase 2 — Autenticación y roles
-15. Registro con correo, consentimiento Ley 29733 y casilla de promociones.
-16. Registro de menores: edad mínima 12, datos del apoderado, cuenta "pendiente de autorización" y pantalla de autorización en recepción.
-17. Login, logout, recuperar contraseña.
-18. Redirección según rol después del login (y **volver al afiche** si venía de uno).
-19. Protección de rutas (un socio no entra a `/admin`) y barra de navegación inferior según rol.
+15. ✅ Registro con sede, correo, consentimiento Ley 29733 y casilla de promociones (la base de datos crea el perfil de socio con un trigger).
+16. ✅ Registro de menores: edad mínima 12, datos del apoderado, cuenta "pendiente" y pantalla de autorización en recepción (función `autorizar_menor`).
+17. ✅ Login, logout, recuperar y restablecer contraseña.
+18. ✅ Redirección según rol después del login (y **vuelta a la página de origen** con `?siguiente=`, solo rutas internas).
+19. ✅ Protección de rutas (`proxy.ts` + verificación de rol en el layout de cada zona) y barra de navegación inferior según rol.
+20b. ⏳ Pegar la migración 5 en Supabase y configurar Authentication (lo hace el usuario; ver README).
+20c. ⏳ Correo propio (p. ej. Resend) para confirmar cuentas y recuperar contraseñas de socios reales (antes del piloto).
 
 ### Fase 3 — Administración básica
 20. CRUD de sedes (dirección, mapa, horarios) y cambio de sede de inscripción de un socio (solo dueño).
