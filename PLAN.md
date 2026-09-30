@@ -776,11 +776,13 @@ urban-force-gym/
 20c. ⏳ Correo propio (p. ej. Resend) para confirmar cuentas y recuperar contraseñas de socios reales (antes del piloto).
 
 ### Fase 3 — Administración básica
-20. CRUD de sedes (dirección, mapa, horarios) y cambio de sede de inscripción de un socio (solo dueño).
-21. CRUD de planes (modalidad, acceso, meses, días extra, 1 o 2 personas → cupo automático).
-22. Crear personal y asignar sede.
-23. CRUD de feriados con horario especial.
-24. Configuración: número y QR de Yape del dueño, precio de la entrada del día.
+20. ✅ CRUD de sedes (dirección, mapa, horarios) y cambio de sede de inscripción de un socio (solo dueño; su plan pasa a la nueva sede).
+21. ✅ CRUD de planes (modalidad, acceso, meses, días extra, 1 o 2 personas → cupo automático). Un plan ya vendido solo cambia nombre, precio, orden y estado.
+22. ✅ Personal: buscar por DNI a alguien registrado y asignarle rol y sedes (función `asignar_personal`; el dueño no puede quitarse su propio rol).
+23. ✅ Feriados con horario especial o cerrado; el inicio público avisa los de los próximos 14 días.
+24. ✅ Configuración: número y QR de Yape del dueño, precio de la entrada del día.
+24b. ✅ Entorno local completo (`pnpm entorno`) y pruebas en navegador (`pnpm test:e2e`) contra la misma API de Supabase.
+24c. ⏳ Pegar la migración 6 en Supabase (lo hace el usuario).
 
 ### Fase 4 — Afiches (planes y precios)
 25. Subida **múltiple** de afiches con compresión (dueño y recepción).
