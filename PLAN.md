@@ -772,7 +772,7 @@ urban-force-gym/
 17. ✅ Login, logout, recuperar y restablecer contraseña.
 18. ✅ Redirección según rol después del login (y **vuelta a la página de origen** con `?siguiente=`, solo rutas internas).
 19. ✅ Protección de rutas (`proxy.ts` + verificación de rol en el layout de cada zona) y barra de navegación inferior según rol.
-20b. ⏳ Pegar la migración 5 en Supabase y configurar Authentication (lo hace el usuario; ver README).
+20b. ✅ Migración 5 instalada en Supabase y Authentication configurado; registro e ingreso probados en producción (el dueño ya entra como administrador).
 20c. ⏳ Correo propio (p. ej. Resend) para confirmar cuentas y recuperar contraseñas de socios reales (antes del piloto).
 
 ### Fase 3 — Administración básica
