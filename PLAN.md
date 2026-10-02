@@ -785,10 +785,10 @@ urban-force-gym/
 24c. ⏳ Pegar la migración 6 en Supabase (lo hace el usuario).
 
 ### Fase 4 — Afiches (planes y precios)
-25. Subida **múltiple** de afiches con compresión (dueño y recepción).
-26. Temporal / permanente, plan y precio enlazados, orden, activar/desactivar, reemplazar imagen.
-27. Galería "Planes y precios" (pública y del socio), con horarios, sedes y la etiqueta "¡Últimos 2 días!".
-28. Tocar un afiche → pago (con sesión) o registro/login y luego pago (sin sesión).
+25. ✅ Subida **múltiple** de afiches (dueño y recepción); el celular los comprime a WEBP de máx. 1600 px antes de subirlos.
+26. ✅ Temporal / permanente, plan y precio enlazados (el precio del plan se completa solo), orden, mostrar/ocultar, reemplazar imagen (borra la anterior) y eliminar (si ya se vendió un plan desde ese afiche, solo se oculta).
+27. ✅ Galería en el inicio público y en la pestaña «Planes» del socio, con la etiqueta «¡Últimos 2 días!» / «¡Último día!».
+28. ✅ Tocar un afiche → pantalla del plan (con sesión) o ingreso/registro y luego vuelta al plan (sin sesión). El pago se agrega en la Fase 5.
 
 ### Fase 5 — Compra y pago manual (v1)
 29. Crear suscripción `pendiente_pago` con precio fijado desde el servidor.
