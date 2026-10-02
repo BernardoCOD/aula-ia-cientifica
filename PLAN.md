@@ -791,14 +791,14 @@ urban-force-gym/
 28. ✅ Tocar un afiche → pantalla del plan (con sesión) o ingreso/registro y luego vuelta al plan (sin sesión). El pago se agrega en la Fase 5.
 
 ### Fase 5 — Compra y pago manual (v1)
-29. Crear suscripción `pendiente_pago` con precio fijado desde el servidor.
-30. Pantalla de pago: Yape del dueño + voucher al bucket privado + casilla "no hay devoluciones".
-31. Plan de 2 personas: DNI de la segunda persona, invitación y dos suscripciones enlazadas.
-32. Pagos por Yape pendientes para el dueño y la recepción (con push por cada pago nuevo).
-33. Función SQL "aprobar pago" → `activa` o `programada` (transacción + auditoría); rechazar con motivo.
-34. Cobro en efectivo en recepción.
-35. Aviso "Tu nuevo plan empezará el…" cuando ya tiene plan activo.
-36. Pantalla "Mi membresía" con color, días, ingresos, ritmo, tipo de acceso y plan programado.
+29. ✅ Compra desde un afiche: la base de datos crea la suscripción `pendiente_pago` con el precio del afiche (`iniciar_compra`); exige aceptar «no hay devoluciones ni congelamiento».
+30. ✅ Pantalla de pago: monto, número y QR de Yape del dueño; el socio sube la captura (comprimida, en el bucket privado) y el número de operación (`enviar_voucher`, no se puede repetir).
+31. ✅ Plan de 2 personas: DNI de la segunda persona (registrada, misma sede, sin pagos ni planes por empezar); un solo pago, dos suscripciones enlazadas que empiezan el mismo día.
+32. ✅ Pagos por Yape pendientes para el dueño (2 sedes) y la recepción (su sede), con la captura por enlace temporal. (El aviso push llega en la Fase 7.)
+33. ✅ `aprobar_pago` → plan `activa` desde hoy o `programada` si ya tiene uno; `rechazar_pago` con motivo (el socio lo ve y reenvía). Los pagos ya no se escriben directo en la tabla.
+34. ✅ Venta en efectivo en recepción (`vender_en_efectivo`), con precio de afiche o precio normal.
+35. ✅ Aviso «Tu nuevo plan empezará el…» al renovar con un plan activo; el programado arranca el día siguiente al fin del anterior (`mi_membresia_al_dia`; el cron de la Fase 7 lo hará para todos).
+36. ✅ «Mi membresía»: semáforo, días o ingresos restantes, vencimiento, ritmo, plan programado y estado del pago.
 
 ### Fase 6 — Asistencia, semáforo y entrada del día
 37. Generar `qr_token` y pantalla "Mi QR".
