@@ -4,7 +4,6 @@ import type { TrpcContext } from "./_core/context";
 
 function context(): TrpcContext {
   return {
-    user: null,
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { cookie: () => undefined } as TrpcContext["res"],
   };

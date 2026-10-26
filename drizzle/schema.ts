@@ -10,17 +10,6 @@ import {
 const timestamp = (name: string) => integer(name, { mode: "timestamp_ms" });
 const now = () => new Date();
 
-export const users = sqliteTable("users", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  openId: text("openId").notNull().unique(),
-  name: text("name"),
-  email: text("email"),
-  loginMethod: text("loginMethod"),
-  role: text("role", { enum: ["user", "admin"] }).default("user").notNull(),
-  createdAt: timestamp("createdAt").$defaultFn(now).notNull(),
-  updatedAt: timestamp("updatedAt").$defaultFn(now).$onUpdate(now).notNull(),
-  lastSignedIn: timestamp("lastSignedIn").$defaultFn(now).notNull(),
-});
 export const students = sqliteTable("students", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   code: text("code").notNull().unique(),
@@ -103,13 +92,6 @@ export const consultations = sqliteTable("consultations", {
 
 // Crea las tablas si no existen, para que la app funcione sin pasos de migración manuales.
 export const CREATE_TABLES_SQL = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    openId TEXT NOT NULL UNIQUE,
-    name TEXT, email TEXT, loginMethod TEXT,
-    role TEXT NOT NULL DEFAULT 'user',
-    createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, lastSignedIn INTEGER NOT NULL
-  )`,
   `CREATE TABLE IF NOT EXISTS students (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT NOT NULL UNIQUE,
@@ -154,8 +136,6 @@ export const CREATE_TABLES_SQL = [
   )`,
 ];
 
-export type User = typeof users.$inferSelect;
-export type InsertUser = typeof users.$inferInsert;
 export type Student = typeof students.$inferSelect;
 export type ModuleProgress = typeof moduleProgress.$inferSelect;
 export type Evaluation = typeof evaluations.$inferSelect;

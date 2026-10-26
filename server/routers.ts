@@ -1,12 +1,4 @@
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
-import { systemRouter } from "./_core/systemRouter";
-import {
-  adminProcedure,
-  protectedProcedure,
-  publicProcedure,
-  router,
-} from "./_core/trpc";
+import { publicProcedure, router } from "./_core/trpc";
 import {
   deleteStudentByCode,
   getRecentConsultations,
@@ -94,7 +86,7 @@ const studentCode = z
     "El código solo puede contener letras, números, guion y guion bajo"
   );
 const teacherProcedure = publicProcedure.use(({ ctx, next }) => {
-  if (!isTeacherRequest(ctx.req, ctx.user))
+  if (!isTeacherRequest(ctx.req))
     throw new TRPCError({
       code: "UNAUTHORIZED",
       message: "Acceso docente requerido",
@@ -103,15 +95,6 @@ const teacherProcedure = publicProcedure.use(({ ctx, next }) => {
 });
 
 export const appRouter = router({
-  system: systemRouter,
-  auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return { success: true } as const;
-    }),
-  }),
   student: router({
     register: publicProcedure
       .input(
@@ -306,7 +289,7 @@ export const appRouter = router({
         return { success: true as const };
       }),
     session: publicProcedure.query(({ ctx }) => ({
-      authenticated: isTeacherRequest(ctx.req, ctx.user),
+      authenticated: isTeacherRequest(ctx.req),
     })),
     logout: publicProcedure.mutation(({ ctx }) => {
       ctx.res.clearCookie(TEACHER_COOKIE, {

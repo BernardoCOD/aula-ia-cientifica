@@ -41,11 +41,7 @@ export function isTeacherTokenValid(token: string | undefined) {
   if (!expires || !signature || Number(expires) < Date.now()) return false;
   return safeEqual(signature, digest(expires));
 }
-export function isTeacherRequest(
-  req: { headers: { cookie?: string } },
-  user?: { role?: string } | null
-) {
-  if (user?.role === "admin") return true;
+export function isTeacherRequest(req: { headers: { cookie?: string } }) {
   const cookies = parse(req.headers.cookie || "");
   return isTeacherTokenValid(cookies[TEACHER_COOKIE]);
 }

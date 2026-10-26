@@ -13,15 +13,13 @@ import {
   UsersRound,
 } from "lucide-react";
 import { useState } from "react";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 
 export default function Admin() {
-  const { user, loading } = useAuth();
   const teacherSession = trpc.admin.session.useQuery();
-  const isAdmin =
-    user?.role === "admin" || teacherSession.data?.authenticated === true;
+  const loading = teacherSession.isLoading;
+  const isAdmin = teacherSession.data?.authenticated === true;
   const research = trpc.admin.research.useQuery(undefined, {
     enabled: isAdmin,
   });

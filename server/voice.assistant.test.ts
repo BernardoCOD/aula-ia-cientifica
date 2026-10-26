@@ -13,7 +13,6 @@ vi.mock("./_core/ai", async importOriginal => ({
 
 function context(): TrpcContext {
   return {
-    user: null,
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: {} as TrpcContext["res"],
   };
