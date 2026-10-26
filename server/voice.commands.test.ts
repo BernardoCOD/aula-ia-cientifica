@@ -24,6 +24,15 @@ describe("local voice commands (sin IA)", () => {
     expect(interpretLocalCommand("volver")).toEqual({ kind: "back" });
   });
 
+  it("opens the learning path with 'quiero empezar' and the home with 'pantalla inicial'", () => {
+    expect(interpretLocalCommand("quiero comenzar")).toMatchObject({ path: "/dashboard" });
+    expect(interpretLocalCommand("empezar la capacitación")).toMatchObject({ path: "/dashboard" });
+    expect(interpretLocalCommand("llévame a la pantalla inicial")).toMatchObject({ path: "/" });
+    // Las preguntas sobre el avance siguen yendo al agente, que consulta la base de datos.
+    expect(interpretLocalCommand("cuánto avancé")).toBeNull();
+    expect(interpretLocalCommand("quiero aprender qué es un prompt")).toBeNull();
+  });
+
   it("leaves questions and ambiguous phrases to the AI agent", () => {
     expect(interpretLocalCommand("¿qué es el postest?")).toBeNull();
     expect(interpretLocalCommand("activa el botón continuar")).toBeNull();

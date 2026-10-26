@@ -88,7 +88,7 @@ export const WAKE_PATTERN =
 const GO = "(?:abre|abrir|ir a|ir al|ve a|ve al|vamos a|vamos al|llevame a|llevame al|quiero ir a|quiero ir al|entra a|entra al|entrar a|entrar al|muestrame|mostrar|pasa a|pasa al|regresa a|regresa al|volver a|volver al|vuelve a|vuelve al)";
 
 const ROUTES: { pattern: RegExp; path: string; label: string }[] = [
-  { pattern: /^(?:la )?(?:pagina de )?inicio$|^(?:la )?pagina principal$/, path: "/", label: "el inicio" },
+  { pattern: /^(?:la )?(?:pagina de )?inicio$|^(?:la )?(?:pagina principal|pantalla inicial|pantalla de inicio)$/, path: "/", label: "el inicio" },
   { pattern: /^(?:mi )?(?:ruta|panel(?: del estudiante)?|menu(?: principal)?|tablero)$/, path: "/dashboard", label: "tu ruta de aprendizaje" },
   { pattern: /^(?:el )?tutor(?: ia| de ia| inteligente)?$/, path: "/tutor", label: "el Tutor IA" },
   { pattern: /^(?:el )?(?:pretest|diagnostico|prueba inicial|evaluacion inicial)$/, path: "/diagnostico", label: "el pretest" },
@@ -175,6 +175,9 @@ export function interpretLocalCommand(
 
   if (/^(?:volver|regresar|atras|ve atras|vuelve atras|regresa)$/.test(value))
     return { kind: "back" };
+  // "Quiero empezar", "comenzar la capacitación": lleva a la ruta de aprendizaje.
+  if (/^(?:quiero )?(?:empezar|comenzar|iniciar|estudiar|aprender)(?: (?:la capacitacion|el curso|a estudiar|a aprender))?$/.test(value))
+    return { kind: "navigate", path: "/dashboard", label: "tu ruta de aprendizaje" };
   const moduleMatch = value.match(new RegExp(`^${GO}? ?(?:el )?modulo ${NUMBER}$`));
   if (moduleMatch) {
     const number = toNumber(moduleMatch[1]);
