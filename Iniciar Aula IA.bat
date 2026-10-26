@@ -17,7 +17,7 @@ if not exist node_modules (
 )
 if not exist .env (
   copy .env.example .env >nul
-  echo Se creo el archivo .env. Escribe tu clave de Claude en ANTHROPIC_API_KEY.
+  echo Se creo el archivo .env. Escribe tu clave gratuita de Gemini en GEMINI_API_KEY.
 )
 
 curl -s -o nul http://localhost:3000 && goto abrir

@@ -9,6 +9,15 @@ alternativas, consulta el progreso guardado en la base de datos y responde pregu
 de la capacitación. Incluye un **Área de consultas** que busca en internet, con fuentes, temas
 relacionados con la IA.
 
+## Documentación del proyecto
+
+- [`PLAN_MEJORA_ASISTENTE.md`](PLAN_MEJORA_ASISTENTE.md): plan de mejora por fases.
+- [`docs/REQUISITOS.md`](docs/REQUISITOS.md): requisitos funcionales y de accesibilidad (WCAG 2.2, DUA 3.0,
+  ISO 9241-11) y su estado.
+- [`docs/DOCUMENTACION_TECNICA.md`](docs/DOCUMENTACION_TECNICA.md): herramientas, arquitectura y código clave,
+  para la metodología y el marco teórico del informe.
+- [`CHANGELOG.md`](CHANGELOG.md): cambios por fase.
+
 ## Requisitos
 
 - [Node.js](https://nodejs.org) 20 o superior.
