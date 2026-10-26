@@ -3,6 +3,18 @@
 Cambios del prototipo Aula IA Científica, de lo más reciente a lo más antiguo. El detalle técnico de cada
 fase está en [`docs/DOCUMENTACION_TECNICA.md`](docs/DOCUMENTACION_TECNICA.md).
 
+## Publicación en la nube — Fase 5 adelantada (2026-10-27)
+
+### Agregado
+- La app se puede publicar en internet con **Render** (servidor) y **Turso** (base de datos), ambos
+  gratuitos, con un link que funciona aunque la PC esté apagada. Configuración en `render.yaml` y guía en
+  `docs/GUIA_PUBLICAR_EN_LA_NUBE.md`.
+- La base de datos acepta `DATABASE_URL=libsql://…` con `DATABASE_AUTH_TOKEN`.
+
+### Corregido
+- Panel docente: si falta la contraseña en `.env`, se dice claramente. Al iniciar, el servidor muestra
+  cuántos caracteres tiene la contraseña leída, porque un `#` sin comillas la cortaba.
+
 ## Fase 1 — Independizar de Manus y adaptar a participantes adultos (2026-10-26)
 
 ### Cambiado

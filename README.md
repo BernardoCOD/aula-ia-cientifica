@@ -18,6 +18,12 @@ relacionados con la IA.
   para la metodología y el marco teórico del informe.
 - [`CHANGELOG.md`](CHANGELOG.md): cambios por fase.
 
+## Publicar en internet
+
+Para que otras personas usen la app desde sus dispositivos sin que tu PC esté encendida, sigue
+[`docs/GUIA_PUBLICAR_EN_LA_NUBE.md`](docs/GUIA_PUBLICAR_EN_LA_NUBE.md): Render (servidor) y Turso (base de
+datos), ambos gratuitos.
+
 ## Requisitos
 
 - [Node.js](https://nodejs.org) 20 o superior.
@@ -55,7 +61,8 @@ npx pnpm@10.4.1 check        # verificación de tipos
 | `ANTHROPIC_MODEL` | Opcional. Modelo de Claude (por defecto `claude-opus-5`). |
 | `ANTHROPIC_EFFORT` | Opcional. `low` (por defecto, respuestas de voz más rápidas), `medium` o `high`. |
 | `ANTHROPIC_RESEARCH_EFFORT` | Opcional. Esfuerzo del Área de consultas (por defecto `medium`). |
-| `DATABASE_URL` | Archivo de la base de datos SQLite. Por defecto `file:./data/aula.db`. |
+| `DATABASE_URL` | Archivo de la base de datos SQLite (por defecto `file:./data/aula.db`) o, en la nube, la base Turso (`libsql://…`). |
+| `DATABASE_AUTH_TOKEN` | Solo en la nube: token de la base Turso. |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Credenciales del panel docente (`/docente`). |
 | `JWT_SECRET` | Firma de las cookies de sesión (texto largo y aleatorio). |
 | `PORT` | Puerto del servidor (por defecto 3000). |

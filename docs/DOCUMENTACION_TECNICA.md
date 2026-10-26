@@ -118,7 +118,9 @@ Versiones instaladas en el proyecto (archivo `pnpm-lock.yaml`), verificadas en l
 | Express | 4.21.2 | Servidor web para Node.js | Sirve la aplicación y la API |
 | tRPC | 11.6.0 | API con tipos compartidos entre navegador y servidor | Comunicación navegador ↔ servidor |
 | Zod | 4.1.12 | Validación de datos | Valida todo lo que llega al servidor (órdenes, fotografía de pantalla, formularios) |
-| **SQLite** (vía libSQL) | cliente 0.18.0 | Base de datos relacional en un solo archivo | Participantes, progreso, evaluaciones, actividades, consultas |
+| **SQLite** (vía libSQL) | cliente 0.18.0 | Base de datos relacional en un solo archivo | Participantes, progreso, evaluaciones, actividades, consultas (en la PC) |
+| **Turso** (plan gratuito) | servicio en la nube | Base de datos libSQL (compatible con SQLite) alojada en la nube | La misma base de datos cuando la app está publicada en internet |
+| **Render** (plan gratuito) | servicio en la nube | Plataforma de alojamiento de aplicaciones web | Publica la app con un link HTTPS para compañeros, docentes y participantes |
 | Drizzle ORM | 0.44.6 | Capa para consultar la base de datos con tipos | Definición de tablas y consultas |
 | Node.js `crypto` (HMAC-SHA256) | incluido en Node.js | Firma criptográfica | Cookie de sesión firmada del panel docente (`server/adminAuth.ts`) |
 
@@ -374,6 +376,7 @@ No se piden nombres ni datos personales.
 | **SQLite** como base de datos | MySQL | Un solo archivo, sin instalar ni administrar un servidor, copia de seguridad copiando el archivo. Es suficiente para el número de participantes de un piloto |
 | **Google Gemini, plan gratuito** | Claude u otra API de pago | Sin costo y sin tarjeta para el piloto. La capa común (`ai.ts`) permite cambiar a una API de pago después |
 | **Web Speech API** del navegador para voz | Whisper u otro reconocedor propio | No requiere servidor de reconocimiento ni costo, y funciona en Chrome y Edge, incluido Android |
+| **Publicación en la nube (Render + Turso)** | Servir la app desde la PC con un túnel (ngrok) | El link funciona aunque la PC esté apagada. Además se evita la página de aviso de ngrok gratuito, que es una barrera para personas ciegas. El código de la base de datos es el mismo: solo cambia `DATABASE_URL` |
 | **Comandos locales + agente de IA** | Solo IA | Las órdenes comunes responden al instante y la app sigue funcionando si la IA falla |
 | **Validación en el servidor** | Confiar solo en el prompt | Las reglas críticas (modo evaluación, controles existentes) se cumplen aunque el modelo se equivoque |
 | **Fotografía genérica de la pantalla** | Comandos programados uno por uno | El asistente funciona en pantallas nuevas sin programar cada comando |
@@ -394,7 +397,7 @@ No se piden nombres ni datos personales.
 
 ## 9. Pruebas automáticas
 
-Se ejecutan con `pnpm test`. Estado al cierre de la Fase 1: **10 archivos, 38 pruebas, todas aprobadas**.
+Se ejecutan con `pnpm test`. Estado actual: **11 archivos, 42 pruebas, todas aprobadas**.
 
 | Archivo | Qué verifica |
 |---|---|
@@ -406,7 +409,8 @@ Se ejecutan con `pnpm test`. Estado al cierre de la Fase 1: **10 archivos, 38 pr
 | `server/student.validation.test.ts` | Ingreso del participante: código dictado, participante que vuelve, códigos inválidos |
 | `server/participant.code.test.ts` | Conversión del código dictado ("pe cero uno" → P01) |
 | `server/no.manus.test.ts` | Independencia de Manus: no quedan referencias en el código |
-| `server/admin.credentials.test.ts`, `server/admin.students.test.ts` | Acceso y gestión del panel docente |
+| `server/database.config.test.ts` | Base de datos local (SQLite) o en la nube (Turso) según `DATABASE_URL` |
+| `server/admin.credentials.test.ts`, `server/admin.students.test.ts` | Acceso al panel docente (incluido el aviso si no está configurado) y gestión de participantes |
 
 ## 10. Cómo ejecutar el proyecto
 
@@ -491,3 +495,29 @@ Videna (IPD), sin datos personales.
   - la ficha no muestra grado ni colegio;
   - al volver con `P01` se reconoce al participante;
   - no hay errores en la consola.
+
+### Publicación en la nube (Fase 5, adelantada)
+
+**Motivo:** el grupo necesita un link que compañeros, docentes y participantes abran desde sus dispositivos,
+sin depender de que la PC del autor esté encendida. Por eso se cambió la decisión del plan (túnel desde la PC
+con ngrok) por la publicación en la nube.
+
+**Cambios:**
+
+- **Base de datos:** acepta una base **Turso** (`DATABASE_URL=libsql://…` y `DATABASE_AUTH_TOKEN`), además del
+  archivo SQLite local. El resto del código no cambió, porque Turso usa libSQL, compatible con SQLite.
+- **`render.yaml`:** configuración de Render como *Blueprint*:
+  - compila con pnpm, inicia en modo producción y usa la región Virginia;
+  - pide las claves al crear el servicio, sin guardarlas en GitHub;
+  - genera `JWT_SECRET` de forma aleatoria.
+- **Panel docente:** avisos claros si falta la contraseña. Al iniciar, el servidor indica qué base de datos
+  usa y cuántos caracteres tiene la contraseña leída, sin mostrarla.
+- **Guía:** `docs/GUIA_PUBLICAR_EN_LA_NUBE.md`, paso a paso.
+
+**Verificación:**
+
+- Se simuló la compilación de Render en una copia limpia del repositorio, con los mismos comandos: compila,
+  inicia en producción, responde en `/` y en `/docente` y registra un participante.
+- `pnpm test`: 42 de 42 pruebas aprobadas. Incluye la configuración de la base de datos local y en la nube.
+- **Pendiente:** la primera publicación real en Render y Turso la hace el autor con sus cuentas, porque
+  requiere iniciar sesión.

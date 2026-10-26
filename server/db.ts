@@ -17,27 +17,43 @@ import {
 type Database = ReturnType<typeof drizzle>;
 let _db: Promise<Database | null> | null = null;
 
-/** Ruta del archivo SQLite: DATABASE_URL="file:./data/aula.db" por defecto (memoria en las pruebas). */
-function databaseUrl() {
-  const configured = process.env.DATABASE_URL;
+/**
+ * Dónde está la base de datos:
+ * - en la PC, un archivo SQLite: DATABASE_URL="file:./data/aula.db" (por defecto);
+ * - en la nube, una base Turso (libSQL, compatible con SQLite): DATABASE_URL="libsql://…" junto con
+ *   DATABASE_AUTH_TOKEN. Es necesaria en servicios como Render, cuyo disco gratuito se borra.
+ * En las pruebas se usa una base en memoria.
+ */
+export function databaseConfig(env: NodeJS.ProcessEnv = process.env): {
+  url: string;
+  authToken?: string;
+} {
+  const configured = env.DATABASE_URL?.trim();
+  if (configured && /^(?:libsql|https?|wss?):\/\//.test(configured))
+    return { url: configured, authToken: env.DATABASE_AUTH_TOKEN?.trim() || undefined };
   if (configured?.startsWith("file:") || configured === ":memory:")
-    return configured;
+    return { url: configured };
   if (configured)
     console.warn(
-      "[Database] DATABASE_URL no es un archivo SQLite (file:...). Se usará ./data/aula.db."
+      "[Database] DATABASE_URL debe ser un archivo (file:...) o una base Turso (libsql://...). Se usará ./data/aula.db."
     );
-  return process.env.VITEST ? ":memory:" : "file:./data/aula.db";
+  return { url: env.VITEST ? ":memory:" : "file:./data/aula.db" };
 }
 
 async function openDatabase(): Promise<Database | null> {
   try {
-    const url = databaseUrl();
-    if (url.startsWith("file:")) {
-      const file = url.slice("file:".length);
+    const config = databaseConfig();
+    if (config.url.startsWith("file:")) {
+      const file = config.url.slice("file:".length);
       fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
     }
-    const client = createClient({ url });
+    const client = createClient(config);
     for (const statement of CREATE_TABLES_SQL) await client.execute(statement);
+    console.log(
+      config.url.startsWith("file:") || config.url === ":memory:"
+        ? `[Database] Base de datos local: ${config.url}`
+        : `[Database] Base de datos en la nube: ${new URL(config.url).host}`
+    );
     return drizzle(client);
   } catch (error) {
     console.warn("[Database] No se pudo abrir la base de datos:", error);
