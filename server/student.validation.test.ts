@@ -9,30 +9,25 @@ function createContext(): TrpcContext {
   };
 }
 
-describe("student input validation", () => {
-  it("rejects identifiers with spaces or special characters", async () => {
+describe("ingreso del participante", () => {
+  it("rechaza códigos con símbolos", async () => {
     const caller = appRouter.createCaller(createContext());
-    await expect(
-      caller.student.register({
-        code: "ATE 024",
-        grade: "2.º de secundaria",
-        section: "A",
-      })
-    ).rejects.toThrow();
+    await expect(caller.student.register({ code: "<script>" })).rejects.toThrow();
     await expect(
       caller.student.dashboard({ code: "<other-student>" })
     ).rejects.toThrow();
   });
 
-  it("accepts a normalized-looking student code at the contract boundary", async () => {
+  it("guarda el código dictado en forma compacta, sin pedir datos personales", async () => {
     const caller = appRouter.createCaller(createContext());
-    // Without a configured DB the helper returns a local-shaped student record; this keeps the contract test deterministic.
-    const result = await caller.student.register({
-      code: "ATE_024",
-      grade: "2.º de secundaria",
-      section: "A",
-    });
-    expect(result.code).toBe("ATE_024");
-    expect(result.grade).toBe("2.º de secundaria");
+    const result = await caller.student.register({ code: "pe cero uno" });
+    expect(result).toMatchObject({ code: "P01", returning: false, pretestDone: false });
+  });
+
+  it("reconoce al participante que vuelve con el mismo código", async () => {
+    const caller = appRouter.createCaller(createContext());
+    await caller.student.register({ code: "P77" });
+    const again = await caller.student.register({ code: "pe siete siete" });
+    expect(again).toMatchObject({ code: "P77", returning: true });
   });
 });

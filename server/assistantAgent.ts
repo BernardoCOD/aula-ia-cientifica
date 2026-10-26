@@ -104,13 +104,13 @@ const routesKnowledge = APP_ROUTES.map(
 ).join("\n");
 
 // Prompt estable (se cachea): describe el rol, la app y las reglas. Lo que cambia en cada turno
-// (pantalla, datos del estudiante, historial) va en los mensajes.
-export const AGENT_SYSTEM_PROMPT = `Eres Jason, el asistente de voz de Aula IA Científica: una plataforma de capacitación sobre inteligencia artificial para estudiantes de secundaria en Lima, Perú, diseñada para personas con discapacidad visual o motriz. Muchas personas usuarias no ven la pantalla o no pueden usar el mouse ni el teclado, así que tú eres sus ojos y sus manos dentro de la aplicación.
+// (pantalla, avance del participante, historial) va en los mensajes.
+export const AGENT_SYSTEM_PROMPT = `Eres Jason, el asistente de voz de Aula IA Científica: una plataforma de capacitación sobre inteligencia artificial para personas adultas con discapacidad visual o motriz vinculadas a la Videna (Instituto Peruano del Deporte) en Lima, Perú. Muchas personas usuarias no ven la pantalla o no pueden usar el mouse ni el teclado, así que tú eres sus ojos y sus manos dentro de la aplicación.
 
 # Qué recibes en cada turno
 - La orden de la persona (transcrita de su voz, puede tener errores de reconocimiento: interpreta la intención más probable).
 - Una fotografía de la pantalla actual: ruta, títulos, texto visible, controles con id (e1, e2...), tablas, diálogos y alertas.
-- Los datos del estudiante guardados en la base de datos, si se identificó.
+- El avance del participante guardado en la base de datos, si ingresó con su código.
 - En órdenes de varios pasos, el resultado de las acciones que ya ejecutaste.
 
 # Qué respondes
@@ -138,7 +138,8 @@ export const AGENT_SYSTEM_PROMPT = `Eres Jason, el asistente de voz de Aula IA C
 - Al escribir en formularios, escribe exactamente lo que dictó la persona. Para enviarlo, pide confirmación.
 - Si lo que piden no existe en la pantalla ni en la app, dilo con honestidad y ofrece una alternativa real. No inventes controles, datos ni resultados.
 - Para "qué hay en pantalla", "dónde estoy" o "qué puedo hacer", responde tú mismo con un resumen útil basado en la fotografía: dónde está, lo principal del contenido y 2 o 3 acciones posibles.
-- Para datos del estudiante (progreso, notas, módulos completados, si puede dar el postest), usa los datos de la base de datos del turno. Si no se identificó, explícale que primero debe registrarse en Identificación.
+- Para el avance del participante (progreso, notas, módulos completados, si puede dar el postest), usa los datos de la base de datos del turno. Si no ingresó, explícale que primero debe decir o escribir su código de participante en la pantalla de ingreso.
+- Si la persona dicta su código de participante, escríbelo en forma compacta, sin espacios: "pe cero uno" se escribe P01.
 - Si la persona está en un formulario o pregunta y dice algo corto como una respuesta ("mi código es A12", "la opción C"), interprétalo en ese contexto.
 
 # Alcance de tus respuestas
@@ -158,7 +159,7 @@ ${routesKnowledge}
 ${courseKnowledge}`;
 
 async function studentSummary(code?: string) {
-  if (!code) return "El estudiante no se ha identificado en este dispositivo.";
+  if (!code) return "El participante no ha ingresado con su código en este dispositivo.";
   const [dashboard, eligibility] = await Promise.all([
     getStudentDashboard(code).catch(() => undefined),
     getEligibility(code).catch(() => undefined),
@@ -174,7 +175,8 @@ async function studentSummary(code?: string) {
     .slice(0, 6)
     .map(item => `${item.type}: ${item.score}/${item.total}`);
   return [
-    `Código ${student.code}, grado ${student.grade}, sección ${student.section}${student.schoolName ? `, colegio ${student.schoolName}` : ""}.`,
+    // Privacidad: a la IA solo llegan el código anónimo y el avance, nunca otros datos guardados.
+    `Código de participante: ${student.code}.`,
     `Progreso por módulo: ${moduleLines.join("; ")}.`,
     `Evaluaciones: ${evaluationLines.join("; ") || "ninguna registrada"}.`,
     `Pretest: ${student.pretestAt ? "rendido" : "pendiente"}. Postest: ${student.postestAt ? "rendido" : eligibility?.eligible ? "habilitado" : `aún bloqueado (${eligibility?.reason ?? "sin datos"})`}.`,
@@ -284,7 +286,7 @@ export async function runAgentTurn(input: AgentInput): Promise<AgentReply> {
     input.step > 0
       ? `CONTINUACIÓN (paso ${input.step + 1}) de la orden: "${input.text}". Resultado de las acciones anteriores: ${input.previousResults.join("; ") || "sin detalles"}. Esta es la pantalla nueva; completa la orden.`
       : `Orden de la persona: "${input.text}"`,
-    `\n# Datos del estudiante (base de datos)\n${student}`,
+    `\n# Avance del participante (base de datos)\n${student}`,
     `\n# Pantalla actual\n${describeSnapshot(input.snapshot)}`,
   ].join("\n");
 

@@ -54,7 +54,7 @@ export type LocalCommand =
 export const ASSISTANT_NAME = "Jason";
 
 export const HELP_MESSAGE =
-  "Puedes hablarme con naturalidad. Por ejemplo: abre el módulo dos, qué hay en la pantalla, lee todo, llévame a mis resultados, escribe mi código A12 en el campo del estudiante, cuánto avancé, qué es un prompt, o busca en consultas cómo verificar una noticia. En las evaluaciones di: lee la pregunta, opción B (marco y paso a la siguiente), en la pregunta tres marca la C, o guardar evaluación al terminar. Para detener la lectura di para. Cuando termines di detener asistente; seguiré atento y me despiertas diciendo oye Jason u ok Jason.";
+  "Puedes hablarme con naturalidad. Por ejemplo: abre el módulo dos, qué hay en la pantalla, lee todo, llévame a mis resultados, mi código es pe cero uno, cuánto avancé, qué es un prompt, o busca en consultas cómo verificar una noticia. En las evaluaciones di: lee la pregunta, opción B (marco y paso a la siguiente), en la pregunta tres marca la C, o guardar evaluación al terminar. Para detener la lectura di para. Cuando termines di detener asistente; seguiré atento y me despiertas diciendo oye Jason u ok Jason.";
 export const AI_UNAVAILABLE_MESSAGE =
   "El asistente inteligente no está disponible en este momento. Puedo seguir ayudándote con órdenes directas como: abre el módulo dos, lee la pantalla, siguiente pregunta o ve al inicio.";
 export const UNSUPPORTED_BROWSER_MESSAGE =
@@ -89,11 +89,11 @@ const GO = "(?:abre|abrir|ir a|ir al|ve a|ve al|vamos a|vamos al|llevame a|lleva
 
 const ROUTES: { pattern: RegExp; path: string; label: string }[] = [
   { pattern: /^(?:la )?(?:pagina de )?inicio$|^(?:la )?(?:pagina principal|pantalla inicial|pantalla de inicio)$/, path: "/", label: "el inicio" },
-  { pattern: /^(?:mi )?(?:ruta|panel(?: del estudiante)?|menu(?: principal)?|tablero)$/, path: "/dashboard", label: "tu ruta de aprendizaje" },
+  { pattern: /^(?:mi )?(?:ruta|panel(?: del (?:estudiante|participante))?|menu(?: principal)?|tablero)$/, path: "/dashboard", label: "tu ruta de aprendizaje" },
   { pattern: /^(?:el )?tutor(?: ia| de ia| inteligente)?$/, path: "/tutor", label: "el Tutor IA" },
   { pattern: /^(?:el )?(?:pretest|diagnostico|prueba inicial|evaluacion inicial)$/, path: "/diagnostico", label: "el pretest" },
   { pattern: /^(?:el )?(?:postest|evaluacion final|prueba final)$/, path: "/postest", label: "la evaluación final" },
-  { pattern: /^(?:la )?(?:identificacion|ficha|registro)$/, path: "/identificacion", label: "la identificación" },
+  { pattern: /^(?:la )?(?:identificacion|ingreso|ficha|registro)$/, path: "/identificacion", label: "la pantalla de ingreso" },
   { pattern: /^(?:el )?panel (?:docente|del docente|del profesor)$/, path: "/docente", label: "el panel docente" },
   { pattern: /^(?:el )?(?:area de )?consultas?$/, path: "/consultas", label: "el Área de consultas" },
   { pattern: /^(?:mis )?resultados$|^mi progreso$/, path: "/dashboard?tab=resultados", label: "tus resultados" },

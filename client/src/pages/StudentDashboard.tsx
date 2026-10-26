@@ -117,7 +117,7 @@ export default function StudentDashboard() {
     {
       mode: "learning",
       route: "/dashboard",
-      currentContent: `Estás en tu panel de estudiante, pestaña ${tabs.find(tab => tab.id === active)?.label ?? "Inicio"}. Puedes decir: abrir módulo, hacer el pretest, hacer el postest, o ir al tutor.`,
+      currentContent: `Estás en tu panel de participante, pestaña ${tabs.find(tab => tab.id === active)?.label ?? "Inicio"}. Puedes decir: abrir módulo, hacer el pretest, hacer el postest, o ir al tutor.`,
     },
     {
       onNext: () => {
@@ -143,11 +143,12 @@ export default function StudentDashboard() {
             Tu ruta te espera
           </h1>
           <p className="mt-3 text-[#688084]">
-            Identifícate para guardar tu progreso y continuar la capacitación.
+            Ingresa con tu código de participante para guardar tu progreso y
+            continuar la capacitación.
           </p>
           <Link
             href="/identificacion"
-            aria-label="Comenzar identificación"
+            aria-label="Ingresar con mi código"
             data-ai-target="start-button"
             data-ai-action="start-identification"
             className="mt-7 inline-flex rounded-xl bg-[#26356b] px-5 py-3 font-bold text-white"
@@ -318,7 +319,7 @@ export default function StudentDashboard() {
             <span className="hidden text-right sm:block">
               <span className="block text-sm font-bold">{student.code}</span>
               <span className="block text-xs text-[#789093]">
-                {student.grade} · Sección {student.section}
+                Participante
               </span>
             </span>
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ffe7d6] font-bold text-[#b55e3d]">
@@ -327,7 +328,7 @@ export default function StudentDashboard() {
           </div>
         </header>
         <main
-          aria-label="Panel de estudiante"
+          aria-label="Panel del participante"
           data-screen="dashboard"
           className="mx-auto max-w-6xl px-5 py-8 lg:px-10 lg:py-10"
         >
@@ -711,7 +712,7 @@ function Profile({
   return (
     <div className="max-w-2xl">
       <p className="text-sm font-bold uppercase tracking-[.15em] text-[#e27a4f]">
-        Tu identificación
+        Tu código
       </p>
       <h1 className="mt-2 text-4xl font-bold">Mi ficha</h1>
       <div className="mt-8 rounded-[2rem] bg-white p-7 shadow-soft">
@@ -722,29 +723,15 @@ function Profile({
           <div>
             <p className="text-xl font-bold">{student.code}</p>
             <p className="text-sm text-[#789093]">
-              Identificador de estudiante
+              Código de participante
             </p>
           </div>
-        </div>
-        <div className="mt-7 grid gap-4 sm:grid-cols-3">
-          {[
-            ["Grado", student.grade],
-            ["Sección", student.section],
-            ["Colegio", student.schoolName || "No indicado"],
-          ].map(([label, value]) => (
-            <div key={label} className="rounded-xl bg-[#f5faf9] p-4">
-              <p className="text-xs font-bold uppercase tracking-[.12em] text-[#8ca0a0]">
-                {label}
-              </p>
-              <p className="mt-2 text-sm font-bold text-[#26356b]">{value}</p>
-            </div>
-          ))}
         </div>
         <div className="mt-7 flex items-start gap-3 rounded-xl bg-[#f5faf9] p-4 text-sm text-[#688084]">
           <ShieldCheck size={18} className="mt-0.5 shrink-0 text-[#5b4bdb]" />
           <p>
-            Tu ficha evita datos personales innecesarios. Usa tu código para
-            volver a encontrar tu progreso en este dispositivo.
+            Tu ficha no guarda nombres ni datos personales. Di o escribe tu
+            código para volver a tu avance.
           </p>
         </div>
         <button

@@ -228,9 +228,6 @@ export async function getResearchDashboard() {
     return {
       id: student.id,
       code: student.code,
-      school: student.schoolName ?? "Sin institución",
-      grade: student.grade,
-      section: student.section,
       pretest: pre ? Math.round((pre.score / pre.total) * 100) : null,
       postest: post ? Math.round((post.score / post.total) * 100) : null,
       difference:
@@ -262,8 +259,6 @@ export async function getResearchDashboard() {
     return {
       id: item.id,
       code: student?.code ?? "Sin código",
-      school: student?.schoolName ?? "Sin institución",
-      grade: student?.grade ?? "—",
       moduleId: item.moduleId,
       activity: item.activity,
       question: item.question,

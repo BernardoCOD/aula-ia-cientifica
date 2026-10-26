@@ -29,8 +29,7 @@ export default function Admin() {
   const deleteStudent = trpc.admin.deleteStudent.useMutation({
     onSuccess: () => research.refetch(),
   });
-  const [school, setSchool] = useState("Todas");
-  const [grade, setGrade] = useState("Todos");
+  const [codeFilter, setCodeFilter] = useState("");
   const [responseFilter, setResponseFilter] = useState("Todas");
   const [selectedResponse, setSelectedResponse] = useState<number | null>(null);
   const analysis = trpc.admin.analyzeResponse.useMutation();
@@ -56,12 +55,8 @@ export default function Admin() {
     aiInteractions: 0,
   };
   const students = data?.students ?? [];
-  const schools = Array.from(new Set(students.map(student => student.school)));
-  const grades = Array.from(new Set(students.map(student => student.grade)));
-  const rows = students.filter(
-    student =>
-      (school === "Todas" || student.school === school) &&
-      (grade === "Todos" || student.grade === grade)
+  const rows = students.filter(student =>
+    student.code.toLowerCase().includes(codeFilter.trim().toLowerCase())
   );
   const responses = (data?.aiResponses ?? []).filter(
     item => responseFilter === "Todas" || item.result === responseFilter
@@ -70,20 +65,9 @@ export default function Admin() {
 
   const exportCsv = () => {
     const values = [
-      [
-        "Código",
-        "Institución",
-        "Grado",
-        "Sección",
-        "Pretest",
-        "Postest",
-        "Diferencia",
-      ],
+      ["Código", "Pretest", "Postest", "Diferencia"],
       ...rows.map(student => [
         student.code,
-        student.school,
-        student.grade,
-        student.section,
         student.pretest ?? "",
         student.postest ?? "",
         student.difference ?? "",
@@ -172,7 +156,7 @@ export default function Admin() {
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             icon={UsersRound}
-            label="Estudiantes registrados"
+            label="Participantes registrados"
             value={summary.total}
             tone="blue"
           />
@@ -268,7 +252,7 @@ export default function Admin() {
               </p>
               <p>
                 <strong className="text-white">Postest:</strong> compara el
-                aprendizaje, no etiqueta al estudiante.
+                aprendizaje, no etiqueta al participante.
               </p>
             </div>
             <div className="mt-7 rounded-2xl bg-white/10 p-4 text-sm text-[#e9d5ff]">
@@ -282,42 +266,25 @@ export default function Admin() {
             <div>
               <h2 className="text-xl font-bold">Seguimiento individual</h2>
               <p className="mt-1 text-sm text-[#64748b]">
-                Filtra por institución o grado para acompañar mejor.
+                Busca a un participante por su código para acompañarlo mejor.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <label className="flex items-center gap-2 rounded-xl border border-[#dbe3ef] px-3 py-2 text-sm">
-                <Filter size={15} className="text-[#64748b]" />
-                <select
-                  value={school}
-                  onChange={event => setSchool(event.target.value)}
-                  className="bg-transparent text-[#172554] outline-none"
-                >
-                  <option>Todas</option>
-                  {schools.map(item => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-              </label>
-              <select
-                value={grade}
-                onChange={event => setGrade(event.target.value)}
-                className="rounded-xl border border-[#dbe3ef] px-3 py-2 text-sm text-[#172554] outline-none"
-              >
-                <option>Todos</option>
-                {grades.map(item => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
-            </div>
+            <label className="flex items-center gap-2 rounded-xl border border-[#dbe3ef] px-3 py-2 text-sm">
+              <Filter size={15} className="text-[#64748b]" />
+              <input
+                value={codeFilter}
+                onChange={event => setCodeFilter(event.target.value)}
+                placeholder="Buscar código"
+                aria-label="Buscar participante por código"
+                className="bg-transparent text-[#172554] outline-none"
+              />
+            </label>
           </div>
           <div className="mt-6 overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
                 <tr className="border-b border-[#e2e8f0] text-xs uppercase tracking-[.12em] text-[#94a3b8]">
                   <th className="pb-3">Código</th>
-                  <th className="pb-3">Institución</th>
-                  <th className="pb-3">Grado</th>
                   <th className="pb-3">Pretest</th>
                   <th className="pb-3">Capacitación</th>
                   <th className="pb-3">Postest</th>
@@ -334,10 +301,6 @@ export default function Admin() {
                     >
                       <td className="py-4 font-bold text-[#172554]">
                         {student.code}
-                      </td>
-                      <td className="py-4">{student.school}</td>
-                      <td className="py-4">
-                        {student.grade} · {student.section}
                       </td>
                       <td className="py-4">
                         {student.pretest === null ? "—" : `${student.pretest}%`}
@@ -380,7 +343,7 @@ export default function Admin() {
                             onClick={() => {
                               if (
                                 window.confirm(
-                                  `Esta acción eliminará al alumno ${student.code} y todos sus resultados, respuestas y progreso. ¿Deseas continuar?`
+                                  `Esta acción eliminará al participante ${student.code} y todos sus resultados, respuestas y progreso. ¿Deseas continuar?`
                                 )
                               )
                                 deleteStudent.mutate({
@@ -389,7 +352,7 @@ export default function Admin() {
                                 });
                             }}
                             disabled={deleteStudent.isPending}
-                            aria-label={`Eliminar alumno ${student.code}`}
+                            aria-label={`Eliminar participante ${student.code}`}
                             className="rounded-lg border border-[#fecaca] p-2 text-[#b91c1c] hover:bg-[#fef2f2] disabled:opacity-50"
                           >
                             <Trash2 size={16} />
@@ -418,7 +381,7 @@ export default function Admin() {
               <div className="flex items-center gap-2">
                 <BrainCircuit className="text-[#4338ca]" size={21} />
                 <h2 className="text-xl font-bold">
-                  Respuestas de estudiantes + apoyo IA
+                  Respuestas de participantes + apoyo IA
                 </h2>
               </div>
               <p className="mt-1 max-w-2xl text-sm text-[#64748b]">

@@ -1,11 +1,7 @@
 import { courseModules } from "@shared/course";
 
-export type StudentSession = {
-  code: string;
-  grade: string;
-  section: string;
-  schoolName?: string;
-};
+/** Sesión del participante en este dispositivo: solo su código (sin datos personales). */
+export type StudentSession = { code: string };
 
 const SESSION_KEY = "aula-ia-student";
 const PROGRESS_KEY = "aula-ia-progress";

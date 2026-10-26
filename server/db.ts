@@ -61,31 +61,32 @@ export async function getStudentByCode(code: string) {
   return rows[0];
 }
 
-export async function upsertStudent(input: {
-  code: string;
-  grade: string;
-  section: string;
-  schoolName?: string;
-}) {
+/**
+ * Registra a un participante por su código o, si el código ya existe, lo reconoce como alguien que
+ * vuelve (returning = true) sin tocar sus datos. No se guardan nombres ni datos personales.
+ */
+export async function upsertStudent(input: { code: string }) {
   const db = await getDb();
-  if (!db) return { ...input, id: 0 };
+  if (!db) return { id: 0, code: input.code, returning: false, pretestDone: false };
   const existing = await getStudentByCode(input.code);
   if (existing) {
     await db
       .update(students)
-      .set({
-        grade: input.grade,
-        section: input.section,
-        schoolName: input.schoolName ?? null,
-      })
+      .set({ lastActivityAt: new Date() })
       .where(eq(students.id, existing.id));
-    return { ...existing, ...input };
+    return {
+      id: existing.id,
+      code: existing.code,
+      returning: true,
+      pretestDone: Boolean(existing.pretestAt),
+    };
   }
+  // grade y section son columnas de la versión escolar: quedan vacías para los participantes.
   const [created] = await db
     .insert(students)
-    .values({ ...input, schoolName: input.schoolName ?? null })
+    .values({ code: input.code, grade: "", section: "", schoolName: null })
     .returning({ id: students.id });
-  return { id: created.id, ...input };
+  return { id: created.id, code: input.code, returning: false, pretestDone: false };
 }
 
 export async function saveProgress(input: {

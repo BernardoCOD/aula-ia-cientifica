@@ -127,7 +127,7 @@ export default function Diagnostic() {
           <p className="mt-4 leading-relaxed text-[#688084]">
             Este diagnóstico de la versión 1 ahora funciona como tu{" "}
             <strong>PRETEST</strong>. Conocerá tu punto de partida y no mostrará
-            estadísticas de otros estudiantes.
+            estadísticas de otros participantes.
           </p>
           <div className="mt-5 flex items-center gap-2 text-sm text-[#547074]">
             <Info size={16} className="text-[#5b4bdb]" /> Responde con

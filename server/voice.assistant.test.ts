@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import type { AgentReply } from "@shared/assistant";
+import { getDb } from "./db";
+import { students } from "../drizzle/schema";
 
 // La IA se simula: las pruebas verifican las barreras del servidor, no al modelo.
 const askClaudeJsonMock = vi.hoisted(() => vi.fn());
@@ -123,7 +125,7 @@ describe("voice assistant agent safety", () => {
   it("sends the student's database record and the screen to the model", async () => {
     askClaudeJsonMock.mockResolvedValue(reply({}));
     const caller = appRouter.createCaller(context());
-    await caller.student.register({ code: "TEST_01", grade: "3.º", section: "B" });
+    await caller.student.register({ code: "TEST_01" });
     await caller.student.progress({ code: "TEST_01", moduleId: "m2", percentage: 100, status: "completed" });
     await caller.assistant.act({
       text: "cuánto avancé",
@@ -134,5 +136,28 @@ describe("voice assistant agent safety", () => {
     expect(prompt).toContain("TEST_01");
     expect(prompt).toContain("Instrucciones que ayudan: 100% (completed)");
     expect(prompt).toContain("e2 [textbox]");
+  });
+
+  it("never sends to the model the school data saved by the old version", async () => {
+    askClaudeJsonMock.mockResolvedValue(reply({}));
+    // Registro de la versión escolar, con grado, sección y colegio guardados.
+    const db = await getDb();
+    await db!.insert(students).values({
+      code: "LEGACY_01",
+      grade: "3.º de secundaria",
+      section: "B",
+      schoolName: "Colegio Virgen del Rosario",
+    });
+    const caller = appRouter.createCaller(context());
+    await caller.assistant.act({
+      text: "cuánto avancé",
+      studentCode: "LEGACY_01",
+      snapshot: learningSnapshot,
+    });
+    const prompt = JSON.stringify(askClaudeJsonMock.mock.calls.at(-1)![0].messages);
+    expect(prompt).toContain("LEGACY_01");
+    expect(prompt).not.toContain("secundaria");
+    expect(prompt).not.toContain("Virgen del Rosario");
+    expect(prompt).not.toMatch(/sección B/i);
   });
 });
