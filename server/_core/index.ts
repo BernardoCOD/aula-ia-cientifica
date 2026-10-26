@@ -58,6 +58,20 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Aula IA lista en http://localhost:${port}/`);
+    const teacherUser = process.env.ADMIN_USERNAME;
+    const teacherPassword = process.env.ADMIN_PASSWORD;
+    if (teacherUser && teacherPassword)
+      console.log(
+        `[Panel docente] Usuario "${teacherUser}", contraseña de ${teacherPassword.length} caracteres.`
+      );
+    else
+      console.warn(
+        "[Panel docente] Falta ADMIN_USERNAME o ADMIN_PASSWORD en el archivo .env: no se podrá ingresar al panel."
+      );
+    if (!process.env.JWT_SECRET)
+      console.warn(
+        "[Panel docente] Falta JWT_SECRET en el archivo .env: escribe un texto largo y aleatorio antes de compartir la app."
+      );
     const provider = aiProvider();
     if (provider)
       console.log(`[IA] Usando ${provider === "gemini" ? "Google Gemini" : "Claude"}.`);

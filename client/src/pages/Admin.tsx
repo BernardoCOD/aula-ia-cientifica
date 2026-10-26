@@ -560,8 +560,11 @@ function AccessGate({ onLoggedIn }: { onLoggedIn: () => void }) {
             />
           </label>
           {login.error && (
-            <p className="mt-4 rounded-xl bg-[#fff4ed] p-3 text-sm font-bold text-[#9a3412]">
-              Usuario o contraseña incorrectos.
+            <p
+              role="alert"
+              className="mt-4 rounded-xl bg-[#fff4ed] p-3 text-sm font-bold text-[#9a3412]"
+            >
+              {login.error.message || "Usuario o contraseña incorrectos."}
             </p>
           )}
           <button

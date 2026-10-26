@@ -35,6 +35,7 @@ import {
   teacherCookieOptions,
   TEACHER_COOKIE,
   validateTeacherCredentials,
+  isTeacherPanelConfigured,
   createTeacherToken,
 } from "./adminAuth";
 import { TRPCError } from "@trpc/server";
@@ -280,6 +281,12 @@ export const appRouter = router({
         })
       )
       .mutation(({ input, ctx }) => {
+        if (!isTeacherPanelConfigured())
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message:
+              "El panel docente no está configurado: completa ADMIN_USERNAME y ADMIN_PASSWORD en el archivo .env y reinicia el servidor.",
+          });
         if (!validateTeacherCredentials(input.username, input.password))
           throw new TRPCError({
             code: "UNAUTHORIZED",

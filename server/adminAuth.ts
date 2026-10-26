@@ -20,6 +20,10 @@ function safeEqual(a: string, b: string) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
+/** true si el .env tiene usuario y contraseña del panel docente. */
+export const isTeacherPanelConfigured = () =>
+  Boolean(process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD);
+
 export function validateTeacherCredentials(username: string, password: string) {
   const expectedUser = process.env.ADMIN_USERNAME || "";
   const expectedPassword = process.env.ADMIN_PASSWORD || "";

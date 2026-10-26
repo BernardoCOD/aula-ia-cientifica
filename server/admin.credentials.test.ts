@@ -29,6 +29,14 @@ describe("teacher credentials", () => {
     expect(result).toMatchObject({ success: true });
   });
 
+  it("explains when the teacher panel is not configured", async () => {
+    delete process.env.ADMIN_PASSWORD;
+    const caller = appRouter.createCaller(context());
+    await expect(
+      caller.admin.login({ username: "docente-prueba", password: "x" })
+    ).rejects.toThrow("El panel docente no está configurado");
+  });
+
   it("rejects a wrong password", async () => {
     const caller = appRouter.createCaller(context());
     await expect(
