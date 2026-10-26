@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+:root {
+  --background: 222 44% 98%;
+  --foreground: 222 47% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 15%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 15%;
+  --primary: 231 48% 27%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 226 40% 94%;
+  --secondary-foreground: 222 47% 18%;
+  --muted: 226 32% 94%;
+  --muted-foreground: 215 20% 43%;
+  --accent: 15 62% 57%;
+  --accent-foreground: 222 47% 15%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 218 28% 87%;
+  --input: 218 28% 87%;
+  --ring: 231 48% 27%;
+  --radius: 1rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: "DM Sans", sans-serif;
+}
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Space Grotesk", sans-serif;
+  letter-spacing: -0.02em;
+}
+button,
+a,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button {
+  transition:
+    transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+button:active {
+  transform: scale(0.97);
+}
+::selection {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.mesh-bg {
+  background:
+    radial-gradient(
+      circle at 15% 15%,
+      rgba(129, 140, 248, 0.16),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 87% 18%,
+      rgba(214, 106, 76, 0.13),
+      transparent 24%
+    ),
+    linear-gradient(135deg, #fbfcff 0%, #f1f5ff 100%);
+}
+.grid-paper {
+  background-image:
+    linear-gradient(rgba(49, 46, 129, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(49, 46, 129, 0.045) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.text-balance {
+  text-wrap: balance;
+}
+.shadow-soft {
+  box-shadow: 0 16px 45px rgba(24, 68, 74, 0.08);
+}
+.shadow-lift {
+  box-shadow: 0 22px 55px rgba(24, 68, 74, 0.14);
+}
+.focus-ring:focus-visible {
+  outline: 3px solid rgba(255, 145, 111, 0.75);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .float-in {
+    animation: float-in 0.55s cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+  .float-in-delay {
+    animation: float-in 0.55s 0.1s cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+  .pulse-dot {
+    animation: pulse-dot 1.8s ease-in-out infinite;
+  }
+}
+@keyframes float-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
