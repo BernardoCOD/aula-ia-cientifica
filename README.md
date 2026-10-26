@@ -71,7 +71,7 @@ consentimiento de la investigación.
 ## Base de datos
 
 SQLite en un solo archivo (`data/aula.db`), sin instalar ningún servidor. Las tablas se crean solas
-al iniciar la app. Guarda estudiantes, progreso por módulo, evaluaciones (pretest y postest),
+al iniciar la app. Guarda participantes (solo su código), progreso por módulo, evaluaciones (pretest y postest),
 actividades, retos, interacciones con el Tutor IA y consultas. Para verla con una interfaz gráfica:
 `npx pnpm@10.4.1 db:studio`. Para empezar de cero, borra la carpeta `data/`.
 
@@ -94,10 +94,12 @@ actividades, retos, interacciones con el Tutor IA y consultas. Para verla con un
 **Qué puede hacer** (habla con naturalidad, no hay frases fijas)
 
 - Navegar: "abre el módulo tres", "llévame a mis resultados", "quiero hacer el pretest".
-- Leer: "qué hay en la pantalla", "lee todo", "lee la tabla de estudiantes", "repite".
+- Leer: "qué hay en la pantalla", "lee todo", "lee la tabla de participantes", "repite".
 - Actuar sobre cualquier control: "pulsa continuar", "abre la pestaña retos", "marca la casilla".
-- Formularios: "mi código es A12, estoy en cuarto grado sección C", "escribe en el colegio Virgen
-  del Rosario". Pide confirmación antes de enviar, guardar evaluaciones, borrar o salir.
+- Ingreso: "mi código es pe cero uno" (se guarda como P01). Cada participante crea su código; si ya
+  participó, usa el mismo para continuar. No se piden nombres ni datos personales.
+- Formularios: dicta lo que quieres escribir en cada campo. Pide confirmación antes de enviar,
+  guardar evaluaciones, borrar o salir.
 - Órdenes de varios pasos: "entra a mi ruta y abre el tutor" (navega, mira la pantalla nueva y sigue).
 - Datos de la base de datos: "cuánto avancé", "qué módulos me faltan", "ya puedo dar el postest".
 - Preguntas sobre los temas de la capacitación: "qué es un prompt", "cómo verifico una fuente".
@@ -122,7 +124,7 @@ queda registrada en la base de datos.
 - **Agente con "fotografía" de la pantalla.** En cada orden, el navegador describe la pantalla
   (`client/src/lib/pageSnapshot.ts`): títulos, texto visible, cada control con un id, sus valores y
   estados, tablas, diálogos y alertas. El servidor (`server/assistantAgent.ts`) envía eso a la IA
-  con los datos del estudiante y el contenido de los módulos (`shared/course.ts`). La IA responde
+  con el código y el avance del participante (sin otros datos) y el contenido de los módulos (`shared/course.ts`). La IA responde
   con salidas estructuradas: qué decir, qué acciones ejecutar y si necesita confirmación. Así el
   asistente funciona en cualquier pantalla, también en las que se agreguen después, sin programar
   comandos uno por uno.

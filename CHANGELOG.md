@@ -3,6 +3,27 @@
 Cambios del prototipo Aula IA Científica, de lo más reciente a lo más antiguo. El detalle técnico de cada
 fase está en [`docs/DOCUMENTACION_TECNICA.md`](docs/DOCUMENTACION_TECNICA.md).
 
+## Fase 1 — Independizar de Manus y adaptar a participantes adultos (2026-10-26)
+
+### Cambiado
+- El ingreso pide solo un **código de participante** que la persona crea (por ejemplo P01). Se puede
+  dictar: "pe cero uno" se guarda como P01. Quien vuelve con su código continúa su avance.
+- Textos de la portada, los paneles y las instrucciones de la IA adaptados a personas adultas con
+  discapacidad visual o motriz de la Videna (IPD).
+- Panel docente: búsqueda por código; la exportación CSV ya no incluye colegio, grado ni sección.
+
+### Seguridad y privacidad
+- A la IA solo llegan el código y el avance del participante, nunca datos escolares (ni de registros
+  antiguos).
+
+### Eliminado
+- Todas las dependencias de Manus: inicio de sesión OAuth, almacenamiento, mapas, `forge.manus.im`,
+  notificaciones, plugin de Vite y paquetes sin uso.
+
+### Pruebas
+- Nuevas: código dictado, participante que vuelve, privacidad del agente e independencia de Manus
+  (38 pruebas en total).
+
 ## Fase 0 — Preparación (2026-10-26)
 
 ### Agregado

@@ -3,7 +3,7 @@
 **Proyecto:** Asistente de voz con inteligencia artificial para capacitación de personas con discapacidad
 visual y motriz, Lima, 2026 (TIF Nivel II, UCV).
 **Objetivo específico que atiende:** OE1. Identificar los requisitos funcionales y de accesibilidad.
-**Estado:** versión de la Fase 0. Se revisa al cerrar cada fase.
+**Estado:** actualizado al cierre de la Fase 1. Se revisa al cerrar cada fase.
 
 **Leyenda de estado** (verificado en el código de la rama `main`): ✅ cumplido · 🟡 parcial · ⬜ pendiente.
 
@@ -40,7 +40,7 @@ Compromiso" indica el principio; "ISO 9241-11" indica la dimensión de usabilida
 |---|---|---|---|---|---|---|
 | RF-01 | Activar el asistente diciendo una palabra de activación ("Oye Jason"), sin tecla ni clic | 2.1.1 (alternativa al teclado), 2.5.3 | Acción y expresión | Eficacia | 2 | ✅ |
 | RF-02 | Tras conceder el micrófono una sola vez, la app escucha sola al abrir y da una **bienvenida hablada** que explica qué se puede decir | 3.3.2, 1.4.2 | Representación, Compromiso | Eficacia, satisfacción | 2 | 🟡 escucha sola; falta la bienvenida hablada |
-| RF-03 | Ingresar con un **código de participante dicho por voz** (ej. "P cero uno"), sin contraseña | 3.3.8, 3.3.7 | Acción y expresión | Eficacia, eficiencia | 1, 2 | 🟡 hoy pide código, grado, sección y colegio |
+| RF-03 | Ingresar con un **código de participante dicho por voz** (ej. "P cero uno"), sin contraseña | 3.3.8, 3.3.7 | Acción y expresión | Eficacia, eficiencia | 1, 2 | 🟡 Fase 1: solo código, creado por el participante y normalizado al dictarlo ("pe cero uno" → P01); falta el ingreso guiado por voz (Fase 2) |
 | RF-04 | Navegar por voz entre secciones, módulos y páginas ("abre el módulo dos", "volver al inicio") | 2.4.2, 2.4.5 | Acción y expresión | Eficacia | 2, 3 | ✅ |
 | RF-05 | Leer la pantalla: resumen breve por defecto, "lee todo", "repite", "dónde estoy" y "qué puedo hacer" | 1.1.1, 1.3.1, 2.4.6 | Representación | Eficacia | 3 | ✅ |
 | RF-06 | Actuar sobre los controles visibles: pulsar, escribir, marcar, abrir pestañas o secciones y desplazarse | 4.1.2, 2.5.3 | Acción y expresión | Eficacia, eficiencia | 3 | ✅ |
@@ -62,11 +62,11 @@ Compromiso" indica el principio; "ISO 9241-11" indica la dimensión de usabilida
 
 | Código | Requisito | Referencia | Fase | Estado |
 |---|---|---|---|---|
-| RNF-01 | Español de Perú (es-PE), lenguaje simple y mensajes breves | WCAG 3.1.1, 3.1.5 (AAA, como buena práctica); DUA Representación (lenguaje) | todas | 🟡 textos aún para "estudiantes de secundaria" |
+| RNF-01 | Español de Perú (es-PE), lenguaje simple y mensajes breves | WCAG 3.1.1, 3.1.5 (AAA, como buena práctica); DUA Representación (lenguaje) | todas | ✅ textos para personas adultas (Fase 1) |
 | RNF-02 | Ninguna acción tiene tiempo límite ni exige precisión; tiempos de espera de escucha generosos | WCAG 2.2.1; ISO/IEC 25010 capacidad de interacción (inclusividad) | 2 | 🟡 revisar en Fase 2 |
 | RNF-03 | Comandos cortos y tolerantes a variaciones (sinónimos, errores de reconocimiento, números dichos con palabras) | DUA Acción y expresión; ISO/IEC 25010 protección frente a errores del usuario | 2, 3 | ✅ |
 | RNF-04 | Semidúplex: el asistente no escucha mientras habla, y la voz se puede detener con un comando ("para") | WCAG 1.4.2 | 2 | ✅ |
-| RNF-05 | **Privacidad:** no se graba audio; los campos de contraseña nunca se leen, se escriben ni se envían a la IA; no se envían nombres ni datos personales a la IA | Ley N.º 29733 (Perú); ISO/IEC 25010 seguridad (confidencialidad) | todas | ✅ |
+| RNF-05 | **Privacidad:** no se graba audio; los campos de contraseña nunca se leen, se escriben ni se envían a la IA; no se envían nombres ni datos personales a la IA | Ley N.º 29733 (Perú); ISO/IEC 25010 seguridad (confidencialidad) | todas | ✅ desde la Fase 1, a la IA solo llegan el código y el avance |
 | RNF-06 | **Seguridad del agente:** la IA solo devuelve acciones de una lista cerrada que el servidor valida; nunca se ejecuta código arbitrario; las claves de la IA solo existen en el servidor | ISO/IEC 25010 seguridad (integridad) | 1, 3 | ✅ |
 | RNF-07 | Compatibilidad: Chrome y Edge de escritorio, y Chrome en Android | WCAG 4.1.2; ISO/IEC 25010 compatibilidad | 5 | 🟡 probado en Chrome/Edge de escritorio |
 | RNF-08 | Publicación con un link **HTTPS** desde la PC (el navegador solo permite el micrófono en sitios seguros) | ISO/IEC 25010 flexibilidad | 5 | ⬜ |

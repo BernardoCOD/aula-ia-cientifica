@@ -139,7 +139,7 @@ Versiones instaladas en el proyecto (archivo `pnpm-lock.yaml`), verificadas en l
 | Prettier | — | Formato uniforme del código |
 | Git y GitHub | — | Control de versiones y respaldo del código |
 | Claude Code | — | Asistente de programación con IA usado durante el desarrollo |
-| Manus | — | Generó la plantilla inicial del proyecto |
+| Manus | — | Generó la plantilla inicial del proyecto; sus dependencias se retiraron en la Fase 1 |
 
 ## 5. Componentes del código (fragmentos clave)
 
@@ -300,7 +300,6 @@ capacitación.
 
 | Tabla | Qué guarda |
 |---|---|
-| `users` | Usuarios de la plantilla original |
 | `students` | Participantes |
 | `module_progress` | Avance por módulo |
 | `evaluations` | Pretest, postest y evaluaciones por módulo |
@@ -311,6 +310,29 @@ capacitación.
 
 Las tablas se crean solas al iniciar (`CREATE TABLE IF NOT EXISTS`), sin pasos manuales. La base es un solo
 archivo: `data/aula.db`.
+
+En el código, la tabla de participantes conserva el nombre `students` de la versión escolar, y sus columnas
+`grade`, `section` y `schoolName` quedan vacías para los participantes nuevos. Así los registros anteriores
+siguen funcionando sin migraciones. La tabla `users` de Manus ya no se usa: en las bases antiguas queda sin
+cambios.
+
+### 5.11 Código de participante dicho por voz — `shared/participant.ts`
+
+```ts
+export function normalizeParticipantCode(input: string): string {
+  // "Mi código es pe cero uno" → quita el relleno → ["pe", "cero", "uno"]
+  const code = words
+    .map(word => SPOKEN_NUMBERS[word] ?? SPOKEN_LETTERS[word] ?? word.toUpperCase())
+    .join("");                                      // → "P01"
+  return PARTICIPANT_CODE_PATTERN.test(code) ? code : "";
+}
+```
+
+**Qué hace:** cada participante crea su código y lo puede **dictar**. El reconocedor de voz suele escribir
+las letras como se pronuncian ("pe", "ese", "ele") y los números con palabras ("cero uno"). Esta función los
+convierte en un código compacto (`P01`), igual en el navegador y en el servidor. La pantalla muestra cómo
+quedará antes de guardar. Si el código ya existe, el sistema reconoce a quien vuelve y continúa su avance.
+No se piden nombres ni datos personales.
 
 ## 6. Relación con el marco teórico
 
@@ -366,23 +388,25 @@ archivo: `data/aula.db`.
   no se envían contraseñas ni nombres, y hay que informarlo en el consentimiento.
 - Los campos de contraseña nunca se leen, se escriben ni se envían a la IA.
 - Las claves de la IA están solo en el servidor (archivo `.env`, que no se sube a GitHub).
-- **Pendiente para la Fase 1:** hoy el agente recibe el código, grado, sección y colegio del estudiante. Al
-  pasar a "participante", se enviará solo el código anónimo y el progreso.
+- **Solo el código y el avance llegan a la IA** (desde la Fase 1). Ni siquiera los datos escolares de
+  registros antiguos se envían; una prueba automática lo verifica.
+- El ingreso no pide nombres, correos, edad ni otros datos personales: solo un código que la persona crea.
 
 ## 9. Pruebas automáticas
 
-Se ejecutan con `pnpm test`. Estado al cierre de la Fase 0: **9 archivos, 31 pruebas, todas aprobadas**.
+Se ejecutan con `pnpm test`. Estado al cierre de la Fase 1: **10 archivos, 38 pruebas, todas aprobadas**.
 
 | Archivo | Qué verifica |
 |---|---|
 | `server/voice.commands.test.ts` | Comandos locales: navegación, lectura, evaluación, activación, privacidad |
-| `server/voice.assistant.test.ts` | Seguridad del agente: acciones inválidas descartadas, modo evaluación |
+| `server/voice.assistant.test.ts` | Seguridad del agente: acciones inválidas descartadas, modo evaluación, privacidad (a la IA no llegan datos escolares) |
 | `server/gemini.provider.test.ts` | Proveedor Gemini: salida JSON con esquema, cambio de modelo al agotarse el cupo (429), búsqueda en Wikipedia |
 | `server/assessment.bank.test.ts` | Bancos de preguntas del pretest y postest |
 | `server/version2.validation.test.ts` | Formato de los datos de evaluación |
-| `server/student.validation.test.ts` | Validación de los datos de ingreso |
+| `server/student.validation.test.ts` | Ingreso del participante: código dictado, participante que vuelve, códigos inválidos |
+| `server/participant.code.test.ts` | Conversión del código dictado ("pe cero uno" → P01) |
+| `server/no.manus.test.ts` | Independencia de Manus: no quedan referencias en el código |
 | `server/admin.credentials.test.ts`, `server/admin.students.test.ts` | Acceso y gestión del panel docente |
-| `server/auth.logout.test.ts` | Cierre de sesión |
 
 ## 10. Cómo ejecutar el proyecto
 
@@ -429,3 +453,41 @@ y abre Chrome listo para usar con la voz.
 - `pnpm dev` responde en `http://localhost:3000`.
 
 **Pendiente del grupo:** unificar la versión del TIF (solo visual o visual + motriz; 12 o 15 ítems).
+
+### Fase 1 — Independizar de Manus y adaptar a participantes adultos
+
+**Objetivo:** que la app funcione sin ninguna pieza de Manus y que esté pensada para personas adultas de la
+Videna (IPD), sin datos personales.
+
+**Cambios:**
+
+- **Se retiró Manus:**
+  - el inicio de sesión OAuth y su cookie;
+  - el almacenamiento de archivos (AWS S3 por medio de Manus);
+  - el cliente de `forge.manus.im`;
+  - mapas, generación de imágenes, transcripción y notificaciones;
+  - el plugin de Vite de la plantilla y las dependencias sin uso (`@aws-sdk/*`, `axios`, `jose`,
+    `streamdown`, `add`).
+
+  Se eliminaron 29 archivos. El panel docente sigue con su propia cookie firmada (HMAC-SHA256).
+- **Ingreso con código de participante:**
+  - la persona crea su código (por ejemplo `P01`) y puede dictarlo;
+  - lo dictado se normaliza ("pe cero uno" → `P01`);
+  - quien vuelve con el mismo código continúa su avance.
+- **Privacidad:** a la IA solo llegan el código y el avance.
+- **Textos para adultos:** se adaptaron la portada, el panel del participante, el panel docente (búsqueda
+  por código en lugar de filtros por colegio y grado, exportación CSV sin datos escolares) y las
+  instrucciones de la IA (agente, Tutor IA, análisis docente y Área de consultas).
+- **No se modificaron** las preguntas del pretest y postest (`client/src/lib/assessment.ts`): son el
+  instrumento de la investigación y cualquier cambio lo decide el grupo.
+
+**Verificación:**
+
+- `pnpm check` sin errores.
+- `pnpm test`: 38 de 38 pruebas aprobadas.
+- `pnpm build` compila y el servidor de producción responde sin variables de Manus.
+- **Prueba en navegador (Chromium):**
+  - "pe cero uno" se guarda como `P01` y lleva al diagnóstico;
+  - la ficha no muestra grado ni colegio;
+  - al volver con `P01` se reconoce al participante;
+  - no hay errores en la consola.
