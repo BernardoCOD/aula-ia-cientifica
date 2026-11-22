@@ -17,8 +17,8 @@ para después.
 - ✅ Guía de evidencias (`docs/GUIA_EVIDENCIAS.md`) y QR de la app (`docs/qr-aula-ia.png`).
 - ⏳ **Parte B, cuestionario Likert por voz:** esperando que el grupo entregue los ítems (12 o 15, con su
   dimensión y escala) y, si existe, la ficha de observación con la lista de tareas.
-- ❓ **Pull request** para unir la rama de trabajo con `main`: se le explicó a Bernardo qué es. Crearlo
-  solo cuando él lo pida.
+- ✅ **Pull request creado** (https://github.com/BernardoCOD/aula-ia-cientifica/pull/1) para unir la rama
+  de trabajo con `main`. Falta que Bernardo lo apruebe con "Merge pull request".
 
 ## Lo que ya está hecho
 
