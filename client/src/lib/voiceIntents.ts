@@ -27,6 +27,8 @@ export type AssistantHandlers = {
   /** Marca la alternativa en la pregunta indicada (por defecto, la pregunta activa). */
   onSelectOption?: (letter: OptionLetter, questionIndex?: number) => void;
   onStartActivity?: () => void;
+  /** Pantalla de ingreso: entra con el código que la persona dictó y confirmó. */
+  onParticipantCode?: (code: string) => void;
 };
 
 export type OptionLetter = "A" | "B" | "C" | "D";
@@ -48,13 +50,20 @@ export type LocalCommand =
   | { kind: "previous_question" }
   | { kind: "go_to_question"; index: number }
   | { kind: "read_question" }
+  | { kind: "read_question_text" }
+  | { kind: "read_options" }
+  | { kind: "read_option"; letter: OptionLetter }
+  | { kind: "evaluation_progress" }
+  | { kind: "focus_next" }
+  | { kind: "focus_previous" }
+  | { kind: "activate_focused" }
   | { kind: "navigate"; path: string; label: string }
   | { kind: "back" };
 
 export const ASSISTANT_NAME = "Jason";
 
 export const HELP_MESSAGE =
-  "Puedes hablarme con naturalidad. Por ejemplo: abre el módulo dos, qué hay en la pantalla, lee todo, llévame a mis resultados, escribe mi código A12 en el campo del estudiante, cuánto avancé, qué es un prompt, o busca en consultas cómo verificar una noticia. En las evaluaciones di: lee la pregunta, opción B (marco y paso a la siguiente), en la pregunta tres marca la C, o guardar evaluación al terminar. Para detener la lectura di para. Cuando termines di detener asistente; seguiré atento y me despiertas diciendo oye Jason u ok Jason.";
+  "Puedes hablarme con naturalidad. Por ejemplo: abre el módulo dos, qué hay en la pantalla, lee todo, llévame a mis resultados, mi código es pe cero uno, cuánto avancé, qué es un prompt, o busca en consultas cómo verificar una noticia. En las evaluaciones di: lee la pregunta, opción B (marco y paso a la siguiente), en la pregunta tres marca la C, o guardar evaluación al terminar. Para detener la lectura di para. Cuando termines di detener asistente; seguiré atento y me despiertas diciendo oye Jason u ok Jason.";
 export const AI_UNAVAILABLE_MESSAGE =
   "El asistente inteligente no está disponible en este momento. Puedo seguir ayudándote con órdenes directas como: abre el módulo dos, lee la pantalla, siguiente pregunta o ve al inicio.";
 export const UNSUPPORTED_BROWSER_MESSAGE =
@@ -88,12 +97,12 @@ export const WAKE_PATTERN =
 const GO = "(?:abre|abrir|ir a|ir al|ve a|ve al|vamos a|vamos al|llevame a|llevame al|quiero ir a|quiero ir al|entra a|entra al|entrar a|entrar al|muestrame|mostrar|pasa a|pasa al|regresa a|regresa al|volver a|volver al|vuelve a|vuelve al)";
 
 const ROUTES: { pattern: RegExp; path: string; label: string }[] = [
-  { pattern: /^(?:la )?(?:pagina de )?inicio$|^(?:la )?pagina principal$/, path: "/", label: "el inicio" },
-  { pattern: /^(?:mi )?(?:ruta|panel(?: del estudiante)?|menu(?: principal)?|tablero)$/, path: "/dashboard", label: "tu ruta de aprendizaje" },
+  { pattern: /^(?:la )?(?:pagina de )?inicio$|^(?:la )?(?:pagina principal|pantalla inicial|pantalla de inicio)$/, path: "/", label: "el inicio" },
+  { pattern: /^(?:mi )?(?:ruta|panel(?: del (?:estudiante|participante))?|menu(?: principal)?|tablero)$/, path: "/dashboard", label: "tu ruta de aprendizaje" },
   { pattern: /^(?:el )?tutor(?: ia| de ia| inteligente)?$/, path: "/tutor", label: "el Tutor IA" },
   { pattern: /^(?:el )?(?:pretest|diagnostico|prueba inicial|evaluacion inicial)$/, path: "/diagnostico", label: "el pretest" },
   { pattern: /^(?:el )?(?:postest|evaluacion final|prueba final)$/, path: "/postest", label: "la evaluación final" },
-  { pattern: /^(?:la )?(?:identificacion|ficha|registro)$/, path: "/identificacion", label: "la identificación" },
+  { pattern: /^(?:la )?(?:identificacion|ingreso|ficha|registro)$/, path: "/identificacion", label: "la pantalla de ingreso" },
   { pattern: /^(?:el )?panel (?:docente|del docente|del profesor)$/, path: "/docente", label: "el panel docente" },
   { pattern: /^(?:el )?(?:area de )?consultas?$/, path: "/consultas", label: "el Área de consultas" },
   { pattern: /^(?:mis )?resultados$|^mi progreso$/, path: "/dashboard?tab=resultados", label: "tus resultados" },
@@ -151,6 +160,17 @@ export function interpretLocalCommand(
   if (/\bmodo simulacion\b/.test(value)) return { kind: "simulation" };
 
   if (options.inQuestion) {
+    // Lecturas rápidas (van antes que "marcar": "lee la opción b" no debe marcar la B).
+    const readOption = value.match(
+      /^(?:lee|leer|leeme|repite|repetir|cual es|que dice|dime)(?: la)? (?:opcion|alternativa|letra)? ?([abcd])$/
+    );
+    if (readOption) return { kind: "read_option", letter: readOption[1].toUpperCase() as OptionLetter };
+    if (/^(?:(?:lee|leer|leeme|repite|repetir|dime|cuales son)(?: las)? )?(?:opciones|alternativas)$/.test(value))
+      return { kind: "read_options" };
+    if (/^(?:lee |leer |leeme |repite )?solo la pregunta$/.test(value))
+      return { kind: "read_question_text" };
+    if (/^(?:cuanto|cuantas|cuantos|que) (?:me falta|me faltan|preguntas me faltan|respondi|llevo|avance)|^(?:mi )?(?:progreso|avance)$/.test(value))
+      return { kind: "evaluation_progress" };
     if (/^(?:guarda|guardar|envia|enviar|entrega|entregar|termina|terminar|finaliza|finalizar)(?: (?:mis |las |el |la )?(?:respuestas|pretest|postest|evaluacion|examen|prueba|test))?$/.test(value))
       return { kind: "submit_evaluation" };
     // "En la pregunta 3 marca la B", "la respuesta de la pregunta dos es la c".
@@ -166,15 +186,28 @@ export function interpretLocalCommand(
       return { kind: "next_question" };
     if (/^(?:pregunta anterior|anterior pregunta|anterior|regresa a la pregunta anterior)$/.test(value))
       return { kind: "previous_question" };
-    const question = value.match(new RegExp(`(?:ir a|ve a|pasa a|abre|responder|contestar)(?: la)? pregunta ${NUMBER}\\b`));
+    const question =
+      value.match(new RegExp(`(?:ir a|ve a|pasa a|abre|responder|contestar|lee|leer|leeme|repite|que dice)(?: la)? pregunta ${NUMBER}\\b`)) ??
+      value.match(new RegExp(`^(?:la )?pregunta (?:numero )?${NUMBER}$`));
     if (question && toNumber(question[1]) > 0)
       return { kind: "go_to_question", index: toNumber(question[1]) - 1 };
     if (/^(?:lee|leer|leeme|repite|repetir)(?: otra vez)? la pregunta$|^(?:cual es )?la pregunta$/.test(value))
       return { kind: "read_question" };
   }
 
+  // Recorrer los controles de la pantalla, como con la tecla Tab (en una pregunta, "siguiente" cambia
+  // de pregunta y se resolvió arriba).
+  if (/^(?:siguiente|el siguiente|siguiente (?:boton|control|elemento|opcion|enlace)|(?:boton|control|elemento) siguiente|avanza|adelante)$/.test(value))
+    return { kind: "focus_next" };
+  if (/^(?:anterior|el anterior|anterior (?:boton|control|elemento|opcion|enlace)|(?:boton|control|elemento) anterior|retrocede)$/.test(value))
+    return { kind: "focus_previous" };
+  if (/^(?:activar|activa|activalo|activala|pulsar|pulsa|pulsalo|presionar|presiona|presionalo|selecciona(?:lo)?|abrelo|aceptar|entrar|entra)$/.test(value))
+    return { kind: "activate_focused" };
   if (/^(?:volver|regresar|atras|ve atras|vuelve atras|regresa)$/.test(value))
     return { kind: "back" };
+  // "Quiero empezar", "comenzar la capacitación": lleva a la ruta de aprendizaje.
+  if (/^(?:quiero )?(?:empezar|comenzar|iniciar|estudiar|aprender)(?: (?:la capacitacion|el curso|a estudiar|a aprender))?$/.test(value))
+    return { kind: "navigate", path: "/dashboard", label: "tu ruta de aprendizaje" };
   const moduleMatch = value.match(new RegExp(`^${GO}? ?(?:el )?modulo ${NUMBER}$`));
   if (moduleMatch) {
     const number = toNumber(moduleMatch[1]);

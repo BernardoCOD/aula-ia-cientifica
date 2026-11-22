@@ -4,7 +4,6 @@ import type { TrpcContext } from "./_core/context";
 
 function context(): TrpcContext {
   return {
-    user: null,
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { cookie: () => undefined } as TrpcContext["res"],
   };
@@ -28,6 +27,14 @@ describe("teacher credentials", () => {
       password: "clave-de-prueba",
     });
     expect(result).toMatchObject({ success: true });
+  });
+
+  it("explains when the teacher panel is not configured", async () => {
+    delete process.env.ADMIN_PASSWORD;
+    const caller = appRouter.createCaller(context());
+    await expect(
+      caller.admin.login({ username: "docente-prueba", password: "x" })
+    ).rejects.toThrow("El panel docente no está configurado");
   });
 
   it("rejects a wrong password", async () => {

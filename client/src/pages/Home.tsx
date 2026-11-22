@@ -80,7 +80,7 @@ export default function Home() {
           <div className="float-in">
             <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#b9d5d3] bg-white/70 px-3 py-2 text-xs font-bold uppercase tracking-[.13em] text-[#5b4bdb]">
               <span className="pulse-dot h-2 w-2 rounded-full bg-[#e27a4f]" />{" "}
-              Capacitación para secundaria
+              Capacitación accesible por voz
             </div>
             <h1 className="max-w-3xl text-balance text-5xl font-bold leading-[1.03] text-[#26356b] sm:text-6xl lg:text-7xl">
               Piensa primero.
@@ -109,18 +109,18 @@ export default function Home() {
               </a>
             </div>
             <div className="mt-9 flex items-center gap-4 text-sm text-[#688084]">
-              <div className="flex -space-x-2">
+              <div className="flex -space-x-2" aria-hidden="true">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#eef6f7] bg-[#d5f0e9] text-xs font-bold text-[#26356b]">
-                  1°
+                  Voz
                 </span>
                 <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#eef6f7] bg-[#ffe7d6] text-xs font-bold text-[#26356b]">
-                  2°
+                  IA
                 </span>
                 <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#eef6f7] bg-[#e7ddff] text-xs font-bold text-[#26356b]">
-                  3°
+                  Tú
                 </span>
               </div>
-              <span>Diseñado para estudiantes de secundaria</span>
+              <span>Diseñado para personas con discapacidad visual o motriz</span>
             </div>
           </div>
           <div className="float-in-delay relative mx-auto w-full max-w-[520px]">

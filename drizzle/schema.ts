@@ -1,5 +1,6 @@
 import {
   integer,
+  real,
   sqliteTable,
   text,
   unique,
@@ -10,17 +11,6 @@ import {
 const timestamp = (name: string) => integer(name, { mode: "timestamp_ms" });
 const now = () => new Date();
 
-export const users = sqliteTable("users", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  openId: text("openId").notNull().unique(),
-  name: text("name"),
-  email: text("email"),
-  loginMethod: text("loginMethod"),
-  role: text("role", { enum: ["user", "admin"] }).default("user").notNull(),
-  createdAt: timestamp("createdAt").$defaultFn(now).notNull(),
-  updatedAt: timestamp("updatedAt").$defaultFn(now).$onUpdate(now).notNull(),
-  lastSignedIn: timestamp("lastSignedIn").$defaultFn(now).notNull(),
-});
 export const students = sqliteTable("students", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   code: text("code").notNull().unique(),
@@ -101,15 +91,33 @@ export const consultations = sqliteTable("consultations", {
   createdAt: timestamp("createdAt").$defaultFn(now).notNull(),
 });
 
+/**
+ * Evidencias del TIF (Fase 4): una fila por cada orden dicha o escrita al asistente. No se guarda audio.
+ * Indicadores de la ficha de observación: comando emitido (heard) y reconocido (recognizedBy, intent),
+ * tarea, si se completó, tiempo de respuesta y si se pidió ayuda.
+ */
+export const voiceEvents = sqliteTable("voice_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  studentId: integer("studentId"),
+  /** Sesión del navegador: agrupa las órdenes de una misma visita. */
+  sessionId: text("sessionId").notNull(),
+  route: text("route").notNull(),
+  /** "voz" o "texto" (escrita en el cuadro del asistente). */
+  inputMode: text("inputMode", { enum: ["voz", "texto"] }).notNull(),
+  heard: text("heard").notNull(),
+  /** Confianza del reconocimiento de voz del navegador (0 a 1), si la informó. */
+  asrConfidence: real("asrConfidence"),
+  recognizedBy: text("recognizedBy").notNull(),
+  intent: text("intent").notNull(),
+  task: text("task").notNull(),
+  completed: integer("completed", { mode: "boolean" }).notNull(),
+  responseMs: integer("responseMs").notNull(),
+  helpNeeded: integer("helpNeeded", { mode: "boolean" }).notNull(),
+  createdAt: timestamp("createdAt").$defaultFn(now).notNull(),
+});
+
 // Crea las tablas si no existen, para que la app funcione sin pasos de migración manuales.
 export const CREATE_TABLES_SQL = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    openId TEXT NOT NULL UNIQUE,
-    name TEXT, email TEXT, loginMethod TEXT,
-    role TEXT NOT NULL DEFAULT 'user',
-    createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, lastSignedIn INTEGER NOT NULL
-  )`,
   `CREATE TABLE IF NOT EXISTS students (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT NOT NULL UNIQUE,
@@ -152,10 +160,16 @@ export const CREATE_TABLES_SQL = [
     studentId INTEGER, question TEXT NOT NULL, answer TEXT NOT NULL,
     sources TEXT NOT NULL, createdAt INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS voice_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    studentId INTEGER, sessionId TEXT NOT NULL, route TEXT NOT NULL,
+    inputMode TEXT NOT NULL, heard TEXT NOT NULL, asrConfidence REAL,
+    recognizedBy TEXT NOT NULL, intent TEXT NOT NULL, task TEXT NOT NULL,
+    completed INTEGER NOT NULL, responseMs INTEGER NOT NULL, helpNeeded INTEGER NOT NULL,
+    createdAt INTEGER NOT NULL
+  )`,
 ];
 
-export type User = typeof users.$inferSelect;
-export type InsertUser = typeof users.$inferInsert;
 export type Student = typeof students.$inferSelect;
 export type ModuleProgress = typeof moduleProgress.$inferSelect;
 export type Evaluation = typeof evaluations.$inferSelect;
@@ -163,3 +177,4 @@ export type Activity = typeof activities.$inferSelect;
 export type Challenge = typeof challenges.$inferSelect;
 export type AiInteraction = typeof aiInteractions.$inferSelect;
 export type Consultation = typeof consultations.$inferSelect;
+export type VoiceEvent = typeof voiceEvents.$inferSelect;

@@ -89,8 +89,8 @@ export const APP_ROUTES: { path: string; name: string; description: string }[] =
   { path: "/", name: "Inicio", description: "Bienvenida y presentación de Aula IA." },
   {
     path: "/identificacion",
-    name: "Identificación",
-    description: "Ficha del estudiante: código, grado, sección y colegio.",
+    name: "Ingreso del participante",
+    description: "El participante crea o dice su código (por ejemplo P01) para guardar y retomar su avance.",
   },
   {
     path: "/diagnostico",
@@ -99,7 +99,7 @@ export const APP_ROUTES: { path: string; name: string; description: string }[] =
   },
   {
     path: "/dashboard",
-    name: "Mi ruta (panel del estudiante)",
+    name: "Mi ruta (panel del participante)",
     description:
       "Pestañas: Inicio, Módulos, Retos, Tutor IA, Consultas, Evaluación final, Resultados y Mi ficha.",
   },
@@ -111,7 +111,7 @@ export const APP_ROUTES: { path: string; name: string; description: string }[] =
   {
     path: "/tutor",
     name: "Tutor IA",
-    description: "El estudiante escribe su respuesta y recibe retroalimentación.",
+    description: "El participante responde una actividad y recibe retroalimentación.",
   },
   {
     path: "/consultas",
@@ -127,6 +127,6 @@ export const APP_ROUTES: { path: string; name: string; description: string }[] =
   {
     path: "/docente",
     name: "Panel docente",
-    description: "Acceso con usuario y contraseña para docentes: estudiantes y resultados.",
+    description: "Acceso con usuario y contraseña para docentes: participantes y resultados.",
   },
 ];

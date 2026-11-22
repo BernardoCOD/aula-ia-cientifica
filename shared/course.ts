@@ -80,7 +80,7 @@ export const lessons: Record<
     points: [
       {
         title: "Da contexto",
-        text: "Indica el grado, el tema, lo que ya intentaste y la parte que no comprendes.",
+        text: "Indica tu nivel, el tema, lo que ya intentaste y la parte que no comprendes.",
       },
       {
         title: "Pide una acción",
@@ -91,7 +91,7 @@ export const lessons: Record<
     options: [
       "Explícame esto.",
       "Haz mi tarea.",
-      "Explica el concepto para mi grado, con un ejemplo y una pregunta para comprobarlo.",
+      "Explica el concepto para mi nivel, con un ejemplo y una pregunta para comprobarlo.",
     ],
     correct: 2,
   },

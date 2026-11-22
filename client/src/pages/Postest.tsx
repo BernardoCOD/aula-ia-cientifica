@@ -242,7 +242,7 @@ function EmptyState() {
     <div className="flex min-h-screen items-center justify-center bg-[#f5faf9] p-5">
       <div className="rounded-[2rem] bg-white p-8 text-center shadow-lift">
         <h1 className="text-2xl font-bold text-[#26356b]">
-          Identifícate primero
+          Ingresa primero con tu código
         </h1>
         <Link
           href="/identificacion"

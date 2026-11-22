@@ -1,0 +1,32 @@
+# Publicación en Render (plan gratuito). Render lee este archivo al crear el servicio con "Blueprint".
+# Guía paso a paso: docs/GUIA_PUBLICAR_EN_LA_NUBE.md
+services:
+  - type: web
+    name: aula-ia-cientifica
+    runtime: node
+    plan: free
+    # Virginia (EE. UU.): la región de Render más cercana a Lima.
+    region: virginia
+    # Instala también las herramientas de compilación (Vite, esbuild) y compila la app.
+    buildCommand: npx -y pnpm@10.4.1 install --frozen-lockfile && npx -y pnpm@10.4.1 build
+    startCommand: NODE_ENV=production node dist/index.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Clave gratuita de Gemini (aistudio.google.com/apikey). Render la pide al crear el servicio.
+      - key: GEMINI_API_KEY
+        sync: false
+      # Base de datos en Turso: el disco gratuito de Render se borra al dormirse.
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_AUTH_TOKEN
+        sync: false
+      # Panel docente (/docente).
+      - key: ADMIN_USERNAME
+        value: docente
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Firma de la cookie del panel docente: Render genera un valor aleatorio.
+      - key: JWT_SECRET
+        generateValue: true

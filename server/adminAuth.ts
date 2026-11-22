@@ -20,6 +20,10 @@ function safeEqual(a: string, b: string) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
+/** true si el .env tiene usuario y contraseña del panel docente. */
+export const isTeacherPanelConfigured = () =>
+  Boolean(process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD);
+
 export function validateTeacherCredentials(username: string, password: string) {
   const expectedUser = process.env.ADMIN_USERNAME || "";
   const expectedPassword = process.env.ADMIN_PASSWORD || "";
@@ -41,11 +45,7 @@ export function isTeacherTokenValid(token: string | undefined) {
   if (!expires || !signature || Number(expires) < Date.now()) return false;
   return safeEqual(signature, digest(expires));
 }
-export function isTeacherRequest(
-  req: { headers: { cookie?: string } },
-  user?: { role?: string } | null
-) {
-  if (user?.role === "admin") return true;
+export function isTeacherRequest(req: { headers: { cookie?: string } }) {
   const cookies = parse(req.headers.cookie || "");
   return isTeacherTokenValid(cookies[TEACHER_COOKIE]);
 }

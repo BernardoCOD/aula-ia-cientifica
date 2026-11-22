@@ -10,37 +10,50 @@ import {
   consultations,
   CREATE_TABLES_SQL,
   evaluations,
-  InsertUser,
   moduleProgress,
   students,
-  users,
 } from "../drizzle/schema";
-import { ENV } from "./_core/env";
 
 type Database = ReturnType<typeof drizzle>;
 let _db: Promise<Database | null> | null = null;
 
-/** Ruta del archivo SQLite: DATABASE_URL="file:./data/aula.db" por defecto (memoria en las pruebas). */
-function databaseUrl() {
-  const configured = process.env.DATABASE_URL;
+/**
+ * Dónde está la base de datos:
+ * - en la PC, un archivo SQLite: DATABASE_URL="file:./data/aula.db" (por defecto);
+ * - en la nube, una base Turso (libSQL, compatible con SQLite): DATABASE_URL="libsql://…" junto con
+ *   DATABASE_AUTH_TOKEN. Es necesaria en servicios como Render, cuyo disco gratuito se borra.
+ * En las pruebas se usa una base en memoria.
+ */
+export function databaseConfig(env: NodeJS.ProcessEnv = process.env): {
+  url: string;
+  authToken?: string;
+} {
+  const configured = env.DATABASE_URL?.trim();
+  if (configured && /^(?:libsql|https?|wss?):\/\//.test(configured))
+    return { url: configured, authToken: env.DATABASE_AUTH_TOKEN?.trim() || undefined };
   if (configured?.startsWith("file:") || configured === ":memory:")
-    return configured;
+    return { url: configured };
   if (configured)
     console.warn(
-      "[Database] DATABASE_URL no es un archivo SQLite (file:...). Se usará ./data/aula.db."
+      "[Database] DATABASE_URL debe ser un archivo (file:...) o una base Turso (libsql://...). Se usará ./data/aula.db."
     );
-  return process.env.VITEST ? ":memory:" : "file:./data/aula.db";
+  return { url: env.VITEST ? ":memory:" : "file:./data/aula.db" };
 }
 
 async function openDatabase(): Promise<Database | null> {
   try {
-    const url = databaseUrl();
-    if (url.startsWith("file:")) {
-      const file = url.slice("file:".length);
+    const config = databaseConfig();
+    if (config.url.startsWith("file:")) {
+      const file = config.url.slice("file:".length);
       fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
     }
-    const client = createClient({ url });
+    const client = createClient(config);
     for (const statement of CREATE_TABLES_SQL) await client.execute(statement);
+    console.log(
+      config.url.startsWith("file:") || config.url === ":memory:"
+        ? `[Database] Base de datos local: ${config.url}`
+        : `[Database] Base de datos en la nube: ${new URL(config.url).host}`
+    );
     return drizzle(client);
   } catch (error) {
     console.warn("[Database] No se pudo abrir la base de datos:", error);
@@ -51,50 +64,6 @@ async function openDatabase(): Promise<Database | null> {
 export function getDb() {
   _db ??= openDatabase();
   return _db;
-}
-
-export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) throw new Error("User openId is required for upsert");
-  const db = await getDb();
-  if (!db) return;
-  const values: InsertUser = { openId: user.openId };
-  const updateSet: Record<string, unknown> = {};
-  const textFields = ["name", "email", "loginMethod"] as const;
-  for (const field of textFields) {
-    if (user[field] !== undefined) {
-      values[field] = user[field] ?? null;
-      updateSet[field] = user[field] ?? null;
-    }
-  }
-  if (user.lastSignedIn !== undefined) {
-    values.lastSignedIn = user.lastSignedIn;
-    updateSet.lastSignedIn = user.lastSignedIn;
-  } else {
-    values.lastSignedIn = new Date();
-    updateSet.lastSignedIn = new Date();
-  }
-  if (user.role !== undefined) {
-    values.role = user.role;
-    updateSet.role = user.role;
-  } else if (user.openId === ENV.ownerOpenId) {
-    values.role = "admin";
-    updateSet.role = "admin";
-  }
-  await db
-    .insert(users)
-    .values(values)
-    .onConflictDoUpdate({ target: users.openId, set: updateSet });
-}
-
-export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const rows = await db
-    .select()
-    .from(users)
-    .where(eq(users.openId, openId))
-    .limit(1);
-  return rows[0];
 }
 
 export async function getStudentByCode(code: string) {
@@ -108,31 +77,32 @@ export async function getStudentByCode(code: string) {
   return rows[0];
 }
 
-export async function upsertStudent(input: {
-  code: string;
-  grade: string;
-  section: string;
-  schoolName?: string;
-}) {
+/**
+ * Registra a un participante por su código o, si el código ya existe, lo reconoce como alguien que
+ * vuelve (returning = true) sin tocar sus datos. No se guardan nombres ni datos personales.
+ */
+export async function upsertStudent(input: { code: string }) {
   const db = await getDb();
-  if (!db) return { ...input, id: 0 };
+  if (!db) return { id: 0, code: input.code, returning: false, pretestDone: false };
   const existing = await getStudentByCode(input.code);
   if (existing) {
     await db
       .update(students)
-      .set({
-        grade: input.grade,
-        section: input.section,
-        schoolName: input.schoolName ?? null,
-      })
+      .set({ lastActivityAt: new Date() })
       .where(eq(students.id, existing.id));
-    return { ...existing, ...input };
+    return {
+      id: existing.id,
+      code: existing.code,
+      returning: true,
+      pretestDone: Boolean(existing.pretestAt),
+    };
   }
+  // grade y section son columnas de la versión escolar: quedan vacías para los participantes.
   const [created] = await db
     .insert(students)
-    .values({ ...input, schoolName: input.schoolName ?? null })
+    .values({ code: input.code, grade: "", section: "", schoolName: null })
     .returning({ id: students.id });
-  return { id: created.id, ...input };
+  return { id: created.id, code: input.code, returning: false, pretestDone: false };
 }
 
 export async function saveProgress(input: {

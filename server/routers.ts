@@ -1,12 +1,4 @@
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
-import { systemRouter } from "./_core/systemRouter";
-import {
-  adminProcedure,
-  protectedProcedure,
-  publicProcedure,
-  router,
-} from "./_core/trpc";
+import { publicProcedure, router } from "./_core/trpc";
 import {
   deleteStudentByCode,
   getRecentConsultations,
@@ -43,9 +35,12 @@ import {
   teacherCookieOptions,
   TEACHER_COOKIE,
   validateTeacherCredentials,
+  isTeacherPanelConfigured,
   createTeacherToken,
 } from "./adminAuth";
 import { TRPCError } from "@trpc/server";
+import { normalizeParticipantCode } from "@shared/participant";
+import { buildEvidenceWorkbook, saveVoiceEvent, voiceEventInputSchema } from "./evidence";
 
 /** Convierte los errores del servicio de IA en mensajes comprensibles que el asistente puede leer. */
 function aiErrorMessage(error: unknown) {
@@ -94,7 +89,7 @@ const studentCode = z
     "El código solo puede contener letras, números, guion y guion bajo"
   );
 const teacherProcedure = publicProcedure.use(({ ctx, next }) => {
-  if (!isTeacherRequest(ctx.req, ctx.user))
+  if (!isTeacherRequest(ctx.req))
     throw new TRPCError({
       code: "UNAUTHORIZED",
       message: "Acceso docente requerido",
@@ -103,26 +98,24 @@ const teacherProcedure = publicProcedure.use(({ ctx, next }) => {
 });
 
 export const appRouter = router({
-  system: systemRouter,
-  auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return { success: true } as const;
-    }),
-  }),
   student: router({
     register: publicProcedure
-      .input(
-        z.object({
-          code: studentCode,
-          grade: z.string().min(1).max(24),
-          section: z.string().min(1).max(8),
-          schoolName: z.string().max(160).optional(),
-        })
-      )
-      .mutation(({ input }) => upsertStudent(input)),
+      .input(z.object({ code: z.string().trim().min(1).max(120) }))
+      .mutation(({ input }) => {
+        // El código puede llegar dictado ("pe cero uno"): se guarda en su forma compacta ("P01").
+        const code = normalizeParticipantCode(input.code);
+        if (!code)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "El código debe tener de 2 a 32 letras o números, por ejemplo P01.",
+          });
+        return upsertStudent({ code });
+      }),
+    /** Evidencias del TIF: una interacción con el asistente (sin audio). Nunca interrumpe a la app. */
+    logEvent: publicProcedure
+      .input(voiceEventInputSchema)
+      .mutation(({ input }) => saveVoiceEvent(input).catch(() => ({ saved: false }))),
     dashboard: publicProcedure
       .input(z.object({ code: studentCode }))
       .query(({ input }) => getStudentDashboard(input.code)),
@@ -228,11 +221,11 @@ export const appRouter = router({
             nextQuestion: string;
           }>({
             system:
-              "Eres un tutor educativo para estudiantes de secundaria. Analiza la respuesta del estudiante sin hacerle la tarea. Devuelve result (correcta, parcial o incorrecta), score (entero de 0 a 100), feedback (2 a 4 frases claras, sin markdown, porque se leen en voz alta) y nextQuestion (una pregunta breve de seguimiento). Promueve verificar fuentes y elaborar respuestas propias.",
+              "Eres un tutor de una capacitación sobre inteligencia artificial para personas adultas con discapacidad visual o motriz. Analiza la respuesta del participante sin hacerle la tarea. Devuelve result (correcta, parcial o incorrecta), score (entero de 0 a 100), feedback (2 a 4 frases claras, sin markdown, porque se leen en voz alta) y nextQuestion (una pregunta breve de seguimiento). Promueve verificar fuentes y elaborar respuestas propias.",
             messages: [
               {
                 role: "user",
-                content: `Módulo: ${input.moduleId}\nActividad: ${input.activity}\nPregunta: ${input.question}\nRespuesta del estudiante: ${input.response}`,
+                content: `Módulo: ${input.moduleId}\nActividad: ${input.activity}\nPregunta: ${input.question}\nRespuesta del participante: ${input.response}`,
               },
             ],
             schema: {
@@ -293,6 +286,12 @@ export const appRouter = router({
         })
       )
       .mutation(({ input, ctx }) => {
+        if (!isTeacherPanelConfigured())
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message:
+              "El panel docente no está configurado: completa ADMIN_USERNAME y ADMIN_PASSWORD en el archivo .env y reinicia el servidor.",
+          });
         if (!validateTeacherCredentials(input.username, input.password))
           throw new TRPCError({
             code: "UNAUTHORIZED",
@@ -306,7 +305,7 @@ export const appRouter = router({
         return { success: true as const };
       }),
     session: publicProcedure.query(({ ctx }) => ({
-      authenticated: isTeacherRequest(ctx.req, ctx.user),
+      authenticated: isTeacherRequest(ctx.req),
     })),
     logout: publicProcedure.mutation(({ ctx }) => {
       ctx.res.clearCookie(TEACHER_COOKIE, {
@@ -348,7 +347,7 @@ export const appRouter = router({
             pregunta: string;
           }>({
             system:
-              "Eres asesor pedagógico para docentes de secundaria. Analiza una respuesta estudiantil con enfoque formativo. Devuelve nivel (fortaleza, en desarrollo o requiere apoyo), hallazgo (una frase), recomendacion (una acción concreta para el docente) y pregunta (una pregunta de seguimiento). No inventes datos ni califiques de forma punitiva.",
+              "Eres asesor pedagógico para facilitadores de una capacitación sobre inteligencia artificial dirigida a personas adultas con discapacidad visual o motriz. Analiza la respuesta de un participante con enfoque formativo. Devuelve nivel (fortaleza, en desarrollo o requiere apoyo), hallazgo (una frase), recomendacion (una acción concreta para el docente) y pregunta (una pregunta de seguimiento). No inventes datos ni califiques de forma punitiva.",
             messages: [
               {
                 role: "user",
@@ -374,6 +373,8 @@ export const appRouter = router({
         )
       ),
     consultations: teacherProcedure.query(() => getRecentConsultations()),
+    /** Excel con los indicadores del TIF (resumen, registro, evaluaciones y definiciones). */
+    exportExcel: teacherProcedure.mutation(() => buildEvidenceWorkbook()),
   }),
 });
 

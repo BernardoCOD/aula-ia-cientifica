@@ -45,7 +45,7 @@ export default function TutorPage() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!student) {
-      toast.error("Identifícate antes de usar el tutor.");
+      toast.error("Ingresa con tu código de participante antes de usar el tutor.");
       return;
     }
     if (response.trim().length < 10) {

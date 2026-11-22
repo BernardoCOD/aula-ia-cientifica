@@ -21,10 +21,18 @@ import {
 } from "lucide-react";
 import { TRPCClientError } from "@trpc/client";
 import type { AgentAction, AgentReply, AgentTurn } from "@shared/assistant";
+import type { RecognizedBy } from "@shared/evidence";
 import { trpc } from "@/lib/trpc";
 import { useAssistantContext } from "@/contexts/AssistantContext";
 import { useSpeech } from "@/hooks/useSpeech";
 import { getStudent } from "@/lib/student";
+import { spokenOption, spokenOptions, spokenProgress, spokenQuestion } from "@/lib/questionSpeech";
+import {
+  CODE_QUESTION,
+  describeControl,
+  spokenCodeCandidate,
+  welcomeMessage,
+} from "@/lib/handsFree";
 import {
   AI_UNAVAILABLE_MESSAGE,
   ASSISTANT_NAME,
@@ -45,6 +53,7 @@ import {
 import {
   executeAction,
   isRiskyElement,
+  realClick,
   waitForPageToSettle,
   type ActionEnvironment,
 } from "@/lib/pageActions";
@@ -56,11 +65,46 @@ type PendingConfirmation = {
   speech: string;
   /** Acción local a ejecutar al confirmar (por ejemplo, enviar la evaluación). */
   run?: () => void;
+  /** Qué decir si la persona responde que no (por defecto: "Entendido, no hice nada."). */
+  cancelSpeech?: string;
 };
 type HistoryItem = { you: string; assistant: string };
+/** Cómo llegó la orden: dicha (con la confianza del reconocedor) o escrita en el cuadro. */
+type UtteranceMeta = { via: "voz" | "texto"; confidence?: number };
+/** Orden en curso, para el registro de evidencias (tiempo desde que se reconoció la frase). */
+type Turn = UtteranceMeta & { text: string; route: string; startedAt: number };
 
 const TEXT_SIZE_KEY = "aula-ia-text-size";
 const ALWAYS_LISTEN_KEY = "aula-ia-always-listen";
+/** Una bienvenida por sesión del navegador (no en cada recarga de la página). */
+const WELCOMED_KEY = "aula-ia-welcomed";
+const EVALUATION_ROUTES = ["/diagnostico", "/postest"];
+const readSession = (key: string) => {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const writeSession = (key: string, value: string) => {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {}
+};
+
+const SESSION_ID_KEY = "aula-ia-session-id";
+
+/** Identificador de la visita actual (agrupa las órdenes de una sesión en el registro). */
+function sessionId() {
+  let id = readSession(SESSION_ID_KEY);
+  if (!id) {
+    id = typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    writeSession(SESSION_ID_KEY, id);
+  }
+  return id;
+}
 const YES = /^(?:si|claro|confirmo|confirmar|adelante|dale|acepto|correcto|hazlo|de acuerdo|ok|okey|por supuesto)\b/;
 const NO = /^(?:no|cancela|cancelar|detente|olvidalo|negativo|mejor no|todavia no)\b/;
 
@@ -118,6 +162,8 @@ export function VoiceAssistant() {
   const [simulation, setSimulation] = useState(false);
   const [simulationLog, setSimulationLog] = useState<string[]>([]);
   const [alwaysListen, setAlwaysListen] = useState(() => readStorage(ALWAYS_LISTEN_KEY) !== "0");
+  /** El navegador bloqueó la voz: hace falta que la persona toque la pantalla una vez. */
+  const [needsTap, setNeedsTap] = useState(false);
 
   // Refs: los callbacks de voz se ejecutan fuera del ciclo de React y necesitan el valor actual.
   const modeRef = useRef<ListeningMode>("off");
@@ -131,7 +177,38 @@ export function VoiceAssistant() {
   const silenceCountRef = useRef(0);
   const greetedRef = useRef(false);
   const selfNavigationRef = useRef(0);
-  const handleRef = useRef<(text: string) => void>(() => undefined);
+  const handleRef = useRef<(text: string, meta?: UtteranceMeta) => void>(() => undefined);
+  const logEvent = trpc.student.logEvent.useMutation();
+  const logEventRef = useRef(logEvent.mutate);
+  logEventRef.current = logEvent.mutate;
+  const turnRef = useRef<Turn | null>(null);
+
+  /**
+   * Evidencias del TIF: registra la orden en curso con su resultado. Se llama una sola vez por orden,
+   * cuando la respuesta está lista (antes de hablar). Si falla, la app sigue igual.
+   */
+  const logTurn = useCallback(
+    (outcome: { recognizedBy: RecognizedBy; intent: string; completed: boolean }) => {
+      const turn = turnRef.current;
+      if (!turn) return;
+      turnRef.current = null;
+      logEventRef.current({
+        sessionId: sessionId(),
+        studentCode: getStudent()?.code,
+        route: turn.route,
+        inputMode: turn.via,
+        heard: turn.text.slice(0, 500),
+        asrConfidence: turn.confidence,
+        recognizedBy: outcome.recognizedBy,
+        intent: outcome.intent.slice(0, 80),
+        completed: outcome.completed,
+        responseMs: Math.min(600_000, Math.round(performance.now() - turn.startedAt)),
+      });
+    },
+    []
+  );
+  /** Último control elegido con "siguiente" o "anterior" (algunos no reciben el foco del navegador). */
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
 
   screenRef.current = screenContext;
   locationRef.current = location;
@@ -164,7 +241,7 @@ export function VoiceAssistant() {
         setOpen(true);
         silenceCountRef.current = 0;
         const command = match[1]?.trim();
-        if (command) handleRef.current(command);
+        if (command) handleRef.current(command, { via: "voz" });
         else if (!greetedRef.current) {
           greetedRef.current = true;
           respondRef.current(`Hola, soy ${ASSISTANT_NAME}. ¿En qué te ayudo?`);
@@ -176,7 +253,7 @@ export function VoiceAssistant() {
   const listenForCommand = useCallback(() => {
     if (!speech.recognitionSupported) return;
     speech.listen({
-      onResult: text => handleRef.current(text),
+      onResult: (text, confidence) => handleRef.current(text, { via: "voz", confidence }),
       onSilence: reason => {
         if (modeRef.current !== "conversation") return;
         if (reason === "not-allowed") {
@@ -184,8 +261,8 @@ export function VoiceAssistant() {
           return;
         }
         silenceCountRef.current++;
-        if (silenceCountRef.current >= 2) {
-          // Dos silencios seguidos: queda en espera para no tener el micrófono abierto sin motivo.
+        if (silenceCountRef.current >= 3) {
+          // Tres silencios seguidos: queda en espera para no tener el micrófono abierto sin motivo.
           silenceCountRef.current = 0;
           const next = alwaysListenRef.current ? "wake" : "off";
           setMode(next);
@@ -213,14 +290,24 @@ export function VoiceAssistant() {
   // ---- Hablar --------------------------------------------------------------------------------
 
   const say = useCallback(
-    (text: string) =>
+    (text: string, onBlocked?: () => void) =>
       new Promise<void>(resolve => {
         if (!text) return resolve();
         lastSpokenRef.current = text;
         setLastResponse(text);
-        speech.speak(text, resolve);
+        // En conversación, la persona puede interrumpir hablando: lo que dijo se atiende como una
+        // orden nueva y la lectura anterior se abandona (la promesa no se resuelve).
+        const onBargeIn =
+          modeRef.current === "conversation"
+            ? (heard: string) => {
+                silenceCountRef.current = 0;
+                if (heard) handleRef.current(heard, { via: "voz" });
+                else resumeListening();
+              }
+            : undefined;
+        speech.speak(text, resolve, { onBargeIn, onBlocked });
       }),
-    [speech]
+    [speech, resumeListening]
   );
 
   /** Responde en voz alta, lo registra en el historial y luego vuelve a escuchar. */
@@ -281,12 +368,19 @@ export function VoiceAssistant() {
     []
   );
 
-  const readQuestion = useCallback(() => {
+  /** Lectura corta de la pregunta activa: "Pregunta 3 de 10. ¿…? A: …. B: …." */
+  const readQuestion = useCallback((withOptions = true) => {
     const screen = screenRef.current;
     if (!screen.currentQuestion) return "No hay una pregunta activa en esta pantalla.";
-    const answered = (screen.totalQuestions ?? 0) - (screen.unanswered?.length ?? 0);
-    const progress = screen.unanswered ? ` Llevas ${answered} de ${screen.totalQuestions} respondidas.` : "";
-    return `Pregunta ${(screen.questionIndex ?? 0) + 1} de ${screen.totalQuestions ?? ""}.${progress} ${screen.currentQuestion} ${(screen.currentOptions ?? []).map((option, index) => `Opción ${String.fromCharCode(65 + index)}: ${option.replace(/[.\s]+$/, "")}.`).join(" ")}`;
+    return spokenQuestion(
+      {
+        index: screen.questionIndex ?? 0,
+        total: screen.totalQuestions,
+        text: screen.currentQuestion,
+        options: screen.currentOptions,
+      },
+      { withOptions }
+    );
   }, []);
 
   const stopAssistant = useCallback(() => {
@@ -372,7 +466,10 @@ export function VoiceAssistant() {
           const total = screen.totalQuestions ?? 1;
           const index = Math.max(0, Math.min(command.index ?? screen.questionIndex ?? 0, total - 1));
           handlers.onSelectOption(command.letter, index);
-          const marked = `Marqué la opción ${command.letter} en la pregunta ${index + 1}.`;
+          const marked =
+            index === (screen.questionIndex ?? 0)
+              ? `Marcada la ${command.letter}.`
+              : `Marcada la ${command.letter} en la pregunta ${index + 1}.`;
           // Como un examen oral: después de marcar, pasa a la siguiente pregunta y la lee.
           if (index < total - 1) {
             handlers.onGoToQuestion ? handlers.onGoToQuestion(index + 1) : handlers.onNext?.();
@@ -383,8 +480,8 @@ export function VoiceAssistant() {
             const missing = (screenRef.current.unanswered ?? []).filter(number => number !== index + 1);
             respond(
               missing.length
-                ? `${marked} Esa es la última pregunta, pero aún te falta responder ${missing.length === 1 ? "la pregunta" : "las preguntas"} ${missing.join(", ")}. Di, por ejemplo: ir a la pregunta ${missing[0]}.`
-                : `${marked} Respondiste todas las preguntas. Cuando quieras enviar tus respuestas, di: guardar evaluación.`
+                ? `${marked} Era la última. ${spokenProgress(total, missing)} Di: pregunta ${missing[0]}.`
+                : `${marked} ${spokenProgress(total, [])}`
             );
           }, 200);
           return;
@@ -422,9 +519,84 @@ export function VoiceAssistant() {
           return;
         case "read_question":
           return respond(readQuestion());
-        case "navigate":
-          envRef.current.navigate(command.path);
+        case "read_question_text":
+          return respond(readQuestion(false));
+        case "read_options":
+          return respond(spokenOptions(screenRef.current.currentOptions));
+        case "read_option":
+          return respond(spokenOption(screenRef.current.currentOptions, command.letter));
+        case "evaluation_progress":
+          return respond(
+            spokenProgress(screenRef.current.totalQuestions ?? 0, screenRef.current.unanswered ?? [])
+          );
+        case "navigate": {
+          // "Quiero empezar" sin haber ingresado: primero se pide el código.
+          const path =
+            command.path === "/dashboard" && !getStudent() ? "/identificacion" : command.path;
+          envRef.current.navigate(path);
+          if (path === "/identificacion") {
+            window.setTimeout(() => respond(`Abrí el ingreso. ${CODE_QUESTION}`), 300);
+            return;
+          }
+          // Al abrir una evaluación se lee directamente la primera pregunta, como en un examen oral.
+          if (EVALUATION_ROUTES.includes(path)) {
+            window.setTimeout(() => {
+              const screen = screenRef.current;
+              respond(
+                screen.currentQuestion
+                  ? `Abrí ${command.label}: ${screen.totalQuestions} preguntas. ${readQuestion()}`
+                  : `Abrí ${command.label}.`
+              );
+            }, 400);
+            return;
+          }
           return respond(`Abrí ${command.label}.`);
+        }
+        case "focus_next":
+        case "focus_previous": {
+          const controls = currentSnapshot().elements.filter(
+            control => !control.state?.includes("deshabilitado")
+          );
+          if (!controls.length) return respond("No hay botones ni campos en esta pantalla.");
+          const elements = controls.map(control => elementById(control.id));
+          const active = document.activeElement;
+          let current = elements.findIndex(element => element === active);
+          if (current === -1) current = elements.findIndex(element => element === lastFocusedRef.current);
+          const step = command.kind === "focus_next" ? 1 : -1;
+          const index =
+            current === -1
+              ? step === 1 ? 0 : controls.length - 1
+              : (current + step + controls.length) % controls.length;
+          const target = elements[index];
+          if (target) {
+            lastFocusedRef.current = target;
+            target.scrollIntoView({ block: "center", behavior: "smooth" });
+            target.focus({ preventScroll: true });
+          }
+          return respond(describeControl(controls[index]));
+        }
+        case "activate_focused": {
+          const active = document.activeElement;
+          const element =
+            active instanceof HTMLElement && active !== document.body && !active.closest("[data-voice-assistant]")
+              ? active
+              : lastFocusedRef.current;
+          if (!element?.isConnected)
+            return respond("Primero elige un control: di siguiente para recorrerlos.");
+          const name = accessibleName(element);
+          if (
+            (element instanceof HTMLInputElement && !["checkbox", "radio", "submit", "button"].includes(element.type)) ||
+            element instanceof HTMLTextAreaElement
+          )
+            return respond(`Es el campo ${name}. Dicta lo que quieres escribir.`);
+          if (isRiskyElement(element)) {
+            const question = `¿Confirmas que quieres pulsar ${name}?`;
+            setPending({ question, actions: [], speech: "", run: () => realClick(element) });
+            return respond(`${question} Di sí o no.`);
+          }
+          realClick(element);
+          return respond(`Listo: ${name}.`);
+        }
         case "back":
           envRef.current.goBack();
           return respond("Volví a la pantalla anterior.");
@@ -500,6 +672,7 @@ export function VoiceAssistant() {
         });
       } catch (error) {
         setBusy(false);
+        logTurn({ recognizedBy: "ia", intent: "error", completed: false });
         respond(
           error instanceof TRPCClientError && error.message
             ? error.message
@@ -510,7 +683,10 @@ export function VoiceAssistant() {
         setBusy(false);
       }
 
+      // Intención para el registro: las acciones que eligió la IA, o "respuesta" si solo respondió.
+      const intent = reply.actions.map(action => action.type).join(",") || "respuesta";
       if (simulationRef.current) {
+        logTurn({ recognizedBy: "ia", intent: "simulation", completed: true });
         const described = reply.actions.map(describeAction);
         setSimulationLog([
           `Orden: ${text}`,
@@ -536,6 +712,7 @@ export function VoiceAssistant() {
           ? `¿Confirmas que quieres pulsar «${accessibleName(elementById(riskyClick.target)!)}»?`
           : "");
       if (confirmation && reply.actions.length) {
+        logTurn({ recognizedBy: "ia", intent, completed: true });
         setPending({ question: confirmation, actions: reply.actions, speech: reply.speech });
         rememberTurn("assistant", confirmation);
         respond(`${confirmation} Di sí o no.`);
@@ -549,18 +726,22 @@ export function VoiceAssistant() {
         return runAgent(text, step + 1, [...previousResults, ...results]);
       }
       rememberTurn("assistant", failed ? results.join("; ") : reply.speech);
+      logTurn({ recognizedBy: "ia", intent, completed: !failed });
       await finishReply(reply, results, failed, readMode);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [agent, currentSnapshot, executeActions, finishReply, respond, say, setPending]
+    [agent, currentSnapshot, executeActions, finishReply, logTurn, respond, say, setPending]
   );
 
   // ---- Punto de entrada de cada frase -------------------------------------------------------
 
   const handleUtterance = useCallback(
-    (raw: string) => {
-      const text = raw.trim();
+    (raw: string, meta: UtteranceMeta = { via: "voz" }) => {
+      // "Oye Jason, abre el módulo dos" en plena conversación: se atiende solo la orden.
+      const wake = WAKE_PATTERN.exec(normalizeSpeech(raw));
+      const text = wake?.[1]?.trim() ? wake[1].trim() : raw.trim();
       if (!text) return;
+      turnRef.current = { ...meta, text, route: locationRef.current, startedAt: performance.now() };
       silenceCountRef.current = 0;
       lastUserTextRef.current = text;
       setOpen(true);
@@ -571,26 +752,30 @@ export function VoiceAssistant() {
         if (YES.test(normalized)) {
           setPending(null);
           if (confirmation.run) {
+            logTurn({ recognizedBy: "confirmacion", intent: "confirmar_si", completed: true });
             confirmation.run();
             respond(confirmation.speech);
             return;
           }
           rememberTurn("user", text);
-          void executeActions(confirmation.actions).then(({ results, failed, readMode }) =>
-            finishReply(
+          void executeActions(confirmation.actions).then(({ results, failed, readMode }) => {
+            logTurn({ recognizedBy: "confirmacion", intent: "confirmar_si", completed: !failed });
+            return finishReply(
               { speech: confirmation.speech, actions: [], confirm: "", continue: false },
               results,
               failed,
               readMode
-            )
-          );
+            );
+          });
           return;
         }
         if (NO.test(normalized)) {
           setPending(null);
-          respond("Entendido, no hice nada.");
+          logTurn({ recognizedBy: "confirmacion", intent: "confirmar_no", completed: true });
+          respond(confirmation.cancelSpeech ?? "Entendido, no hice nada.");
           return;
         }
+        logTurn({ recognizedBy: "no_entendido", intent: "confirmacion", completed: false });
         respond(`${confirmation.question} Responde sí o no.`);
         return;
       }
@@ -598,11 +783,29 @@ export function VoiceAssistant() {
       const local = interpretLocalCommand(text, {
         inQuestion: Boolean(screenRef.current.currentQuestion),
       });
+      // Pantalla de ingreso: un código dictado ("pe cero uno") se confirma antes de entrar.
+      const code =
+        !local && locationRef.current === "/identificacion" ? spokenCodeCandidate(text) : null;
+      if (code) {
+        const question = `Entendí ${code.split("").join(" ")}. ¿Es correcto?`;
+        setPending({
+          question,
+          actions: [],
+          speech: "",
+          run: () => handlersRef.current.onParticipantCode?.(code),
+          cancelSpeech: `De acuerdo. ${CODE_QUESTION}`,
+        });
+        logTurn({ recognizedBy: "codigo", intent: "codigo_dictado", completed: true });
+        respond(`${question} Di sí o no.`);
+        return;
+      }
       if (local) {
+        logTurn({ recognizedBy: "local", intent: local.kind, completed: local.kind !== "decline" });
         runLocal(local);
         return;
       }
       if (!aiReady) {
+        logTurn({ recognizedBy: "ia_no_disponible", intent: "sin_ia", completed: false });
         respond(AI_UNAVAILABLE_MESSAGE);
         return;
       }
@@ -610,7 +813,7 @@ export function VoiceAssistant() {
       void runAgent(text);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [aiReady, executeActions, finishReply, respond, runAgent, runLocal, setPending]
+    [aiReady, executeActions, finishReply, logTurn, respond, runAgent, runLocal, setPending]
   );
   handleRef.current = handleUtterance;
 
@@ -665,12 +868,48 @@ export function VoiceAssistant() {
     }
   }, [listenForWakeWord, say, setMode, speech]);
 
-  // Activación por voz: queda atenta a "Oye Jason" desde que carga la página, sin tocar nada.
-  useEffect(() => {
+  const listenForWakeIfEnabled = useCallback(() => {
     if (alwaysListenRef.current && speech.recognitionSupported) {
       setMode("wake");
       listenForWakeWord();
+    } else setMode("off");
+  }, [listenForWakeWord, setMode, speech.recognitionSupported]);
+
+  /**
+   * Bienvenida hablada (una vez por sesión del navegador). Después queda escuchando una orden, sin
+   * que la persona toque nada. Si el navegador bloquea la voz hasta el primer toque, se muestra el
+   * aviso "Toca la pantalla" y, mientras tanto, sigue atento a "Oye Jason".
+   */
+  const welcome = useCallback(() => {
+    writeSession(WELCOMED_KEY, "1");
+    greetedRef.current = true;
+    setNeedsTap(false);
+    setOpen(true);
+    if (speech.recognitionSupported) setMode("conversation");
+    const text =
+      locationRef.current === "/identificacion"
+        ? `Hola, soy ${ASSISTANT_NAME}, tu asistente de voz. ${CODE_QUESTION}`
+        : welcomeMessage(getStudent()?.code);
+    void say(text, () => {
+      writeSession(WELCOMED_KEY, "");
+      setNeedsTap(true);
+      listenForWakeIfEnabled();
+    }).then(resumeListening);
+  }, [listenForWakeIfEnabled, resumeListening, say, setMode, speech.recognitionSupported]);
+
+  const skipVoice = () => {
+    writeSession(WELCOMED_KEY, "1");
+    setNeedsTap(false);
+  };
+
+  useEffect(() => {
+    if (readSession(WELCOMED_KEY) || !speech.synthesisSupported) {
+      // Ya hubo bienvenida en esta sesión: queda atenta a "Oye Jason", sin tocar nada.
+      listenForWakeIfEnabled();
+      return;
     }
+    const timer = window.setTimeout(welcome, 600);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -704,7 +943,16 @@ export function VoiceAssistant() {
     if (modeRef.current === "off" || Date.now() - selfNavigationRef.current < 4000) return;
     const timer = window.setTimeout(() => {
       const title = document.querySelector("main h1, h1")?.textContent?.trim();
-      if (title) respondRef.current(`Estás en: ${title}.`);
+      const screen = screenRef.current;
+      // Si Jason hace una pregunta, queda escuchando la respuesta sin pedir "Oye Jason".
+      const asks = location === "/identificacion" || (EVALUATION_ROUTES.includes(location) && screen.currentQuestion);
+      if (asks && modeRef.current === "wake" && speech.recognitionSupported) setMode("conversation");
+      if (location === "/identificacion")
+        respondRef.current(`Estás en el ingreso. ${CODE_QUESTION}`);
+      else if (EVALUATION_ROUTES.includes(location) && screen.currentQuestion)
+        // Al llegar a una evaluación (por ejemplo, después de ingresar) se lee la primera pregunta.
+        respondRef.current(`Estás en: ${title}. ${screen.totalQuestions} preguntas. ${readQuestion()}`);
+      else if (title) respondRef.current(`Estás en: ${title}.`);
     }, 700);
     return () => window.clearTimeout(timer);
   }, [location]);
@@ -712,7 +960,7 @@ export function VoiceAssistant() {
   const handleTypedSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!typed.trim()) return;
-    handleUtterance(typed);
+    handleUtterance(typed, { via: "texto" });
     setTyped("");
   };
 
@@ -733,6 +981,34 @@ export function VoiceAssistant() {
       <p className="sr-only" aria-live="polite">
         {lastResponse}
       </p>
+      {needsTap && (
+        // El navegador no deja hablar a la página hasta el primer toque: toda la pantalla es el botón.
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#172554]/45 p-5 sm:items-center">
+          <button
+            type="button"
+            autoFocus
+            onClick={welcome}
+            aria-label="Toca la pantalla para activar la voz de Jason"
+            className="absolute inset-0 h-full w-full cursor-pointer"
+          />
+          <div className="pointer-events-none relative w-full max-w-md rounded-3xl bg-white p-7 text-center shadow-lift">
+            <Volume2 className="mx-auto text-[#5b4bdb]" size={40} aria-hidden="true" />
+            <p className="mt-4 text-2xl font-bold text-[#26356b]">
+              Toca la pantalla para activar la voz
+            </p>
+            <p className="mt-2 text-[#4b686c]">
+              Jason, el asistente de voz, te guiará. Después podrás usar la app solo hablando.
+            </p>
+            <button
+              type="button"
+              onClick={skipVoice}
+              className="pointer-events-auto mt-5 text-sm font-bold text-[#5b4bdb] underline"
+            >
+              Usar sin voz
+            </button>
+          </div>
+        </div>
+      )}
       {open && (
         <section
           role="dialog"

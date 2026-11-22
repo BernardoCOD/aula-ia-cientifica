@@ -4,6 +4,7 @@ import type {
   SnapshotElement,
   SnapshotTable,
 } from "@shared/assistant";
+import { spokenQuestion } from "./questionSpeech";
 
 // Construye una "fotografía" accesible de la pantalla para el agente de IA: texto visible,
 // controles interactivos con un id estable y tablas. Cada fotografía reemplaza los ids anteriores.
@@ -307,13 +308,31 @@ export function takeSnapshot(
 
 /** Resumen breve para leer en voz alta sin usar la IA (título, descripción y controles principales). */
 export function speakableSummary(snapshot: PageSnapshot) {
+  // En una evaluación basta el título y la pregunta activa: lo demás alarga la lectura.
+  if (snapshot.mode === "evaluation" && snapshot.screen?.currentQuestion)
+    return [
+      snapshot.title && `Estás en: ${snapshot.title}.`,
+      spokenQuestion({
+        index: snapshot.screen.questionIndex ?? 0,
+        total: snapshot.screen.totalQuestions,
+        text: snapshot.screen.currentQuestion,
+        options: snapshot.screen.currentOptions,
+      }),
+    ]
+      .filter(Boolean)
+      .join(" ");
   const main = document.querySelector("main");
   const description = clean(
     main?.querySelector("h1 ~ p, h1 + p")?.textContent,
     300
   );
   const question = snapshot.screen?.currentQuestion
-    ? `Pregunta ${(snapshot.screen.questionIndex ?? 0) + 1} de ${snapshot.screen.totalQuestions ?? ""}: ${snapshot.screen.currentQuestion} Alternativas: ${(snapshot.screen.currentOptions ?? []).map((option, index) => `${String.fromCharCode(65 + index)}, ${option}`).join(". ")}.`
+    ? spokenQuestion({
+        index: snapshot.screen.questionIndex ?? 0,
+        total: snapshot.screen.totalQuestions,
+        text: snapshot.screen.currentQuestion,
+        options: snapshot.screen.currentOptions,
+      })
     : "";
   const controls = snapshot.elements
     .filter(element => !element.state?.includes("deshabilitado"))

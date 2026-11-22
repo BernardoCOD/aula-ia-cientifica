@@ -2,6 +2,7 @@ import {
   BarChart3,
   BrainCircuit,
   Download,
+  FileSpreadsheet,
   Filter,
   LockKeyhole,
   LogIn,
@@ -13,15 +14,13 @@ import {
   UsersRound,
 } from "lucide-react";
 import { useState } from "react";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 
 export default function Admin() {
-  const { user, loading } = useAuth();
   const teacherSession = trpc.admin.session.useQuery();
-  const isAdmin =
-    user?.role === "admin" || teacherSession.data?.authenticated === true;
+  const loading = teacherSession.isLoading;
+  const isAdmin = teacherSession.data?.authenticated === true;
   const research = trpc.admin.research.useQuery(undefined, {
     enabled: isAdmin,
   });
@@ -31,11 +30,27 @@ export default function Admin() {
   const deleteStudent = trpc.admin.deleteStudent.useMutation({
     onSuccess: () => research.refetch(),
   });
-  const [school, setSchool] = useState("Todas");
-  const [grade, setGrade] = useState("Todos");
+  const [codeFilter, setCodeFilter] = useState("");
   const [responseFilter, setResponseFilter] = useState("Todas");
   const [selectedResponse, setSelectedResponse] = useState<number | null>(null);
   const analysis = trpc.admin.analyzeResponse.useMutation();
+  const excel = trpc.admin.exportExcel.useMutation();
+
+  /** Descarga el Excel de evidencias del TIF (lo arma el servidor con todos los registros). */
+  const exportExcel = async () => {
+    const file = await excel.mutateAsync();
+    const bytes = Uint8Array.from(atob(file.base64), char => char.charCodeAt(0));
+    const url = URL.createObjectURL(
+      new Blob([bytes], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      })
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = file.filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (loading)
     return (
@@ -58,12 +73,8 @@ export default function Admin() {
     aiInteractions: 0,
   };
   const students = data?.students ?? [];
-  const schools = Array.from(new Set(students.map(student => student.school)));
-  const grades = Array.from(new Set(students.map(student => student.grade)));
-  const rows = students.filter(
-    student =>
-      (school === "Todas" || student.school === school) &&
-      (grade === "Todos" || student.grade === grade)
+  const rows = students.filter(student =>
+    student.code.toLowerCase().includes(codeFilter.trim().toLowerCase())
   );
   const responses = (data?.aiResponses ?? []).filter(
     item => responseFilter === "Todas" || item.result === responseFilter
@@ -72,20 +83,9 @@ export default function Admin() {
 
   const exportCsv = () => {
     const values = [
-      [
-        "Código",
-        "Institución",
-        "Grado",
-        "Sección",
-        "Pretest",
-        "Postest",
-        "Diferencia",
-      ],
+      ["Código", "Pretest", "Postest", "Diferencia"],
       ...rows.map(student => [
         student.code,
-        student.school,
-        student.grade,
-        student.section,
         student.pretest ?? "",
         student.postest ?? "",
         student.difference ?? "",
@@ -164,17 +164,36 @@ export default function Admin() {
               tomar decisiones pedagógicas.
             </p>
           </div>
-          <button
-            onClick={exportCsv}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#cbd5e1] bg-white px-4 py-3 text-sm font-bold text-[#334155] hover:bg-[#f8fafc]"
-          >
-            <Download size={17} /> Exportar resultados
-          </button>
+          <div className="flex flex-col items-stretch gap-2 sm:items-end">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => void exportExcel().catch(() => undefined)}
+                disabled={excel.isPending}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#172554] px-4 py-3 text-sm font-bold text-white hover:bg-[#26356b] disabled:cursor-wait disabled:opacity-70"
+              >
+                <FileSpreadsheet size={17} />
+                {excel.isPending ? "Preparando Excel…" : "Descargar Excel de evidencias"}
+              </button>
+              <button
+                onClick={exportCsv}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#cbd5e1] bg-white px-4 py-3 text-sm font-bold text-[#334155] hover:bg-[#f8fafc]"
+              >
+                <Download size={17} /> Exportar CSV
+              </button>
+            </div>
+            <p role="status" className="text-xs text-[#64748b]">
+              {excel.isError
+                ? "No se pudo preparar el Excel. Inténtalo otra vez."
+                : excel.data
+                  ? `Descargado: ${excel.data.participants} participantes, ${excel.data.events} interacciones.`
+                  : "Resumen por participante, registro de interacciones, evaluaciones y definiciones."}
+            </p>
+          </div>
         </div>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             icon={UsersRound}
-            label="Estudiantes registrados"
+            label="Participantes registrados"
             value={summary.total}
             tone="blue"
           />
@@ -270,7 +289,7 @@ export default function Admin() {
               </p>
               <p>
                 <strong className="text-white">Postest:</strong> compara el
-                aprendizaje, no etiqueta al estudiante.
+                aprendizaje, no etiqueta al participante.
               </p>
             </div>
             <div className="mt-7 rounded-2xl bg-white/10 p-4 text-sm text-[#e9d5ff]">
@@ -284,42 +303,25 @@ export default function Admin() {
             <div>
               <h2 className="text-xl font-bold">Seguimiento individual</h2>
               <p className="mt-1 text-sm text-[#64748b]">
-                Filtra por institución o grado para acompañar mejor.
+                Busca a un participante por su código para acompañarlo mejor.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <label className="flex items-center gap-2 rounded-xl border border-[#dbe3ef] px-3 py-2 text-sm">
-                <Filter size={15} className="text-[#64748b]" />
-                <select
-                  value={school}
-                  onChange={event => setSchool(event.target.value)}
-                  className="bg-transparent text-[#172554] outline-none"
-                >
-                  <option>Todas</option>
-                  {schools.map(item => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-              </label>
-              <select
-                value={grade}
-                onChange={event => setGrade(event.target.value)}
-                className="rounded-xl border border-[#dbe3ef] px-3 py-2 text-sm text-[#172554] outline-none"
-              >
-                <option>Todos</option>
-                {grades.map(item => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
-            </div>
+            <label className="flex items-center gap-2 rounded-xl border border-[#dbe3ef] px-3 py-2 text-sm">
+              <Filter size={15} className="text-[#64748b]" />
+              <input
+                value={codeFilter}
+                onChange={event => setCodeFilter(event.target.value)}
+                placeholder="Buscar código"
+                aria-label="Buscar participante por código"
+                className="bg-transparent text-[#172554] outline-none"
+              />
+            </label>
           </div>
           <div className="mt-6 overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
                 <tr className="border-b border-[#e2e8f0] text-xs uppercase tracking-[.12em] text-[#94a3b8]">
                   <th className="pb-3">Código</th>
-                  <th className="pb-3">Institución</th>
-                  <th className="pb-3">Grado</th>
                   <th className="pb-3">Pretest</th>
                   <th className="pb-3">Capacitación</th>
                   <th className="pb-3">Postest</th>
@@ -336,10 +338,6 @@ export default function Admin() {
                     >
                       <td className="py-4 font-bold text-[#172554]">
                         {student.code}
-                      </td>
-                      <td className="py-4">{student.school}</td>
-                      <td className="py-4">
-                        {student.grade} · {student.section}
                       </td>
                       <td className="py-4">
                         {student.pretest === null ? "—" : `${student.pretest}%`}
@@ -382,7 +380,7 @@ export default function Admin() {
                             onClick={() => {
                               if (
                                 window.confirm(
-                                  `Esta acción eliminará al alumno ${student.code} y todos sus resultados, respuestas y progreso. ¿Deseas continuar?`
+                                  `Esta acción eliminará al participante ${student.code} y todos sus resultados, respuestas y progreso. ¿Deseas continuar?`
                                 )
                               )
                                 deleteStudent.mutate({
@@ -391,7 +389,7 @@ export default function Admin() {
                                 });
                             }}
                             disabled={deleteStudent.isPending}
-                            aria-label={`Eliminar alumno ${student.code}`}
+                            aria-label={`Eliminar participante ${student.code}`}
                             className="rounded-lg border border-[#fecaca] p-2 text-[#b91c1c] hover:bg-[#fef2f2] disabled:opacity-50"
                           >
                             <Trash2 size={16} />
@@ -420,7 +418,7 @@ export default function Admin() {
               <div className="flex items-center gap-2">
                 <BrainCircuit className="text-[#4338ca]" size={21} />
                 <h2 className="text-xl font-bold">
-                  Respuestas de estudiantes + apoyo IA
+                  Respuestas de participantes + apoyo IA
                 </h2>
               </div>
               <p className="mt-1 max-w-2xl text-sm text-[#64748b]">
@@ -599,8 +597,11 @@ function AccessGate({ onLoggedIn }: { onLoggedIn: () => void }) {
             />
           </label>
           {login.error && (
-            <p className="mt-4 rounded-xl bg-[#fff4ed] p-3 text-sm font-bold text-[#9a3412]">
-              Usuario o contraseña incorrectos.
+            <p
+              role="alert"
+              className="mt-4 rounded-xl bg-[#fff4ed] p-3 text-sm font-bold text-[#9a3412]"
+            >
+              {login.error.message || "Usuario o contraseña incorrectos."}
             </p>
           )}
           <button

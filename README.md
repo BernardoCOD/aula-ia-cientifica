@@ -9,6 +9,21 @@ alternativas, consulta el progreso guardado en la base de datos y responde pregu
 de la capacitación. Incluye un **Área de consultas** que busca en internet, con fuentes, temas
 relacionados con la IA.
 
+## Documentación del proyecto
+
+- [`PLAN_MEJORA_ASISTENTE.md`](PLAN_MEJORA_ASISTENTE.md): plan de mejora por fases.
+- [`docs/REQUISITOS.md`](docs/REQUISITOS.md): requisitos funcionales y de accesibilidad (WCAG 2.2, DUA 3.0,
+  ISO 9241-11) y su estado.
+- [`docs/DOCUMENTACION_TECNICA.md`](docs/DOCUMENTACION_TECNICA.md): herramientas, arquitectura y código clave,
+  para la metodología y el marco teórico del informe.
+- [`CHANGELOG.md`](CHANGELOG.md): cambios por fase.
+
+## Publicar en internet
+
+Para que otras personas usen la app desde sus dispositivos sin que tu PC esté encendida, sigue
+[`docs/GUIA_PUBLICAR_EN_LA_NUBE.md`](docs/GUIA_PUBLICAR_EN_LA_NUBE.md): Render (servidor) y Turso (base de
+datos), ambos gratuitos.
+
 ## Requisitos
 
 - [Node.js](https://nodejs.org) 20 o superior.
@@ -46,7 +61,8 @@ npx pnpm@10.4.1 check        # verificación de tipos
 | `ANTHROPIC_MODEL` | Opcional. Modelo de Claude (por defecto `claude-opus-5`). |
 | `ANTHROPIC_EFFORT` | Opcional. `low` (por defecto, respuestas de voz más rápidas), `medium` o `high`. |
 | `ANTHROPIC_RESEARCH_EFFORT` | Opcional. Esfuerzo del Área de consultas (por defecto `medium`). |
-| `DATABASE_URL` | Archivo de la base de datos SQLite. Por defecto `file:./data/aula.db`. |
+| `DATABASE_URL` | Archivo de la base de datos SQLite (por defecto `file:./data/aula.db`) o, en la nube, la base Turso (`libsql://…`). |
+| `DATABASE_AUTH_TOKEN` | Solo en la nube: token de la base Turso. |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Credenciales del panel docente (`/docente`). |
 | `JWT_SECRET` | Firma de las cookies de sesión (texto largo y aleatorio). |
 | `PORT` | Puerto del servidor (por defecto 3000). |
@@ -62,18 +78,36 @@ consentimiento de la investigación.
 ## Base de datos
 
 SQLite en un solo archivo (`data/aula.db`), sin instalar ningún servidor. Las tablas se crean solas
-al iniciar la app. Guarda estudiantes, progreso por módulo, evaluaciones (pretest y postest),
+al iniciar la app. Guarda participantes (solo su código), progreso por módulo, evaluaciones (pretest y postest),
 actividades, retos, interacciones con el Tutor IA y consultas. Para verla con una interfaz gráfica:
 `npx pnpm@10.4.1 db:studio`. Para empezar de cero, borra la carpeta `data/`.
+
+## Evidencias para el TIF
+
+- **Registro automático (sin audio):** cada orden dicha o escrita a Jason se guarda con:
+  - lo que se dijo y si fue por voz o por texto;
+  - la confianza del reconocimiento;
+  - quién la resolvió (comando local, IA, código o confirmación);
+  - la tarea, si se completó, el tiempo de respuesta y si se pidió ayuda.
+- **Excel del panel docente** (`/docente` → **Descargar Excel de evidencias**), con cuatro hojas: resumen por
+  participante, registro de interacciones, evaluaciones y definiciones de cada indicador.
+- **Guía para reunir capturas, video y anexos:** [`docs/GUIA_EVIDENCIAS.md`](docs/GUIA_EVIDENCIAS.md), con el
+  QR de la app (`docs/qr-aula-ia.png`).
 
 ## El asistente de voz
 
 **Cómo activarlo: solo con la voz**
 
+- Al abrir la app, **Jason da la bienvenida en voz alta** y queda escuchando. Si el navegador no deja
+  hablar a la página (pasa la primera vez en celulares y en computadoras de otras personas), aparece el
+  aviso **"Toca la pantalla para activar la voz"**: basta un toque en cualquier parte.
+
 - Di **"Oye Jason"** u **"Ok Jason"** en cualquier pantalla, como con el asistente de Google. Puedes
   decir la orden seguida: "Oye Jason, abre el módulo dos".
 - La activación por voz está encendida desde que se abre la página. Tras cada respuesta vuelve a
-  escuchar sin que digas la frase otra vez; después de dos silencios queda en espera de "Oye Jason".
+  escuchar sin que digas la frase otra vez; después de tres silencios queda en espera de "Oye Jason".
+- **Puedes interrumpirlo hablando:** si dices algo mientras Jason habla, se calla y te atiende (en
+  computadoras; en celulares Android, toca la pantalla o di la orden cuando termine).
 - Di **"detener asistente"** para terminar la conversación (seguirá atento a "Oye Jason").
 - Para usarla sin manos, abre la app con **`Iniciar Aula IA.bat`** (doble clic). Inicia el servidor
   y abre Chrome (o Edge) en una ventana propia, con la voz habilitada sin que nadie toque la
@@ -85,19 +119,26 @@ actividades, retos, interacciones con el Tutor IA y consultas. Para verla con un
 **Qué puede hacer** (habla con naturalidad, no hay frases fijas)
 
 - Navegar: "abre el módulo tres", "llévame a mis resultados", "quiero hacer el pretest".
-- Leer: "qué hay en la pantalla", "lee todo", "lee la tabla de estudiantes", "repite".
+- Leer: "qué hay en la pantalla", "lee todo", "lee la tabla de participantes", "repite".
 - Actuar sobre cualquier control: "pulsa continuar", "abre la pestaña retos", "marca la casilla".
-- Formularios: "mi código es A12, estoy en cuarto grado sección C", "escribe en el colegio Virgen
-  del Rosario". Pide confirmación antes de enviar, guardar evaluaciones, borrar o salir.
+- Ingreso guiado: "quiero empezar" → Jason pregunta el código → "pe cero uno" → "Entendí P 0 1, ¿es
+  correcto?" → "sí". Cada participante crea su código; si ya participó, usa el mismo para continuar.
+  No se piden nombres ni datos personales.
+- Recorrer la pantalla: "siguiente" y "anterior" pasan por los botones, enlaces y campos diciendo su
+  nombre; "activar" pulsa el elegido (si envía o borra algo, pide confirmación).
+- Formularios: dicta lo que quieres escribir en cada campo. Pide confirmación antes de enviar,
+  guardar evaluaciones, borrar o salir.
 - Órdenes de varios pasos: "entra a mi ruta y abre el tutor" (navega, mira la pantalla nueva y sigue).
 - Datos de la base de datos: "cuánto avancé", "qué módulos me faltan", "ya puedo dar el postest".
 - Preguntas sobre los temas de la capacitación: "qué es un prompt", "cómo verifico una fuente".
 - Buscar en internet: "busca en consultas qué herramientas de IA ayudan a personas ciegas".
 - Accesibilidad: "aumenta la letra", "habla más despacio", "para".
 
-**En evaluaciones (pretest y postest)** puede leer preguntas y alternativas, moverse entre ellas y
-marcar la opción que la persona dicte ("opción B", "elijo la tercera"), pero nunca sugiere
-respuestas. Esto lo garantiza el servidor aunque el modelo se equivoque.
+**En evaluaciones (pretest y postest)** lee como un examen oral, en forma breve: "Pregunta 3 de 10.
+*Texto*. A: … B: … C: … D: …". Órdenes instantáneas (sin IA): "pregunta tres", "lee la opción B",
+"lee las opciones", "solo la pregunta", "cuántas me faltan", "siguiente", "opción C" (marca y lee la
+siguiente) y "guardar evaluación". Nunca sugiere respuestas: lo garantiza el servidor aunque el modelo
+se equivoque.
 
 **Modo simulación**: describe lo que haría sin tocar la página. Útil para demostraciones.
 
@@ -113,7 +154,7 @@ queda registrada en la base de datos.
 - **Agente con "fotografía" de la pantalla.** En cada orden, el navegador describe la pantalla
   (`client/src/lib/pageSnapshot.ts`): títulos, texto visible, cada control con un id, sus valores y
   estados, tablas, diálogos y alertas. El servidor (`server/assistantAgent.ts`) envía eso a la IA
-  con los datos del estudiante y el contenido de los módulos (`shared/course.ts`). La IA responde
+  con el código y el avance del participante (sin otros datos) y el contenido de los módulos (`shared/course.ts`). La IA responde
   con salidas estructuradas: qué decir, qué acciones ejecutar y si necesita confirmación. Así el
   asistente funciona en cualquier pantalla, también en las que se agreguen después, sin programar
   comandos uno por uno.
@@ -126,8 +167,10 @@ queda registrada en la base de datos.
   envío, borrado o salida.
 - **Comandos locales** (`client/src/lib/voiceIntents.ts`): las órdenes más comunes se resuelven al
   instante en el navegador, sin red, y mantienen la app usable si la IA no está disponible.
-- **Voz en semi dúplex** (`client/src/hooks/useSpeech.ts`): nunca escucha mientras habla, para no
-  oírse a sí mismo; divide las lecturas largas en frases y elige una voz en español latinoamericano.
+- **Interrupción por voz** (`client/src/hooks/useSpeech.ts`, `client/src/lib/bargeIn.ts`): mientras
+  habla, el micrófono sigue abierto; si la persona habla, el asistente se calla y la atiende. Lo que
+  coincide con lo que el asistente está leyendo se descarta como eco de los parlantes. Divide las
+  lecturas largas en frases y elige una voz en español latinoamericano.
 - **Privacidad**: no se graba audio. Los campos de contraseña nunca se leen, se escriben ni se
   envían a la IA.
 
@@ -137,6 +180,8 @@ queda registrada en la base de datos.
 - Cada orden al agente tarda unos segundos, porque la IA analiza la pantalla completa.
 - Con el esfuerzo `low` el asistente responde más rápido; si se equivoca en órdenes complejas, prueba
   `ANTHROPIC_EFFORT=medium`.
-- Mientras el asistente habla no escucha (para no oírse a sí mismo): espera a que termine para hablarle.
+- Si el asistente repite en voz alta exactamente lo que dices (por ejemplo, una palabra de la pregunta
+  que está leyendo), puede confundirlo con su propio eco: di "para" y luego la orden. Con audífonos
+  la interrupción funciona mejor. En Android se interrumpe tocando la pantalla.
 - El reconocimiento de voz no funciona en el panel de vista previa del editor: usa Chrome o Edge.
 - Si se usa Claude (opcional), cada consulta tiene costo; con Gemini gratuito el límite es de uso diario.
