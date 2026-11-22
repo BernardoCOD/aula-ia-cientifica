@@ -118,6 +118,7 @@ Versiones instaladas en el proyecto (archivo `pnpm-lock.yaml`), verificadas en l
 | Express | 4.21.2 | Servidor web para Node.js | Sirve la aplicación y la API |
 | tRPC | 11.6.0 | API con tipos compartidos entre navegador y servidor | Comunicación navegador ↔ servidor |
 | Zod | 4.1.12 | Validación de datos | Valida todo lo que llega al servidor (órdenes, fotografía de pantalla, formularios) |
+| ExcelJS | 4.4.0 | Biblioteca para crear archivos Excel (.xlsx) | Genera en el servidor el Excel de evidencias del panel docente (Fase 4) |
 | **SQLite** (vía libSQL) | cliente 0.18.0 | Base de datos relacional en un solo archivo | Participantes, progreso, evaluaciones, actividades, consultas (en la PC) |
 | **Turso** (plan gratuito) | servicio en la nube | Base de datos libSQL (compatible con SQLite) alojada en la nube | La misma base de datos cuando la app está publicada en internet |
 | **Render** (plan gratuito) | servicio en la nube | Plataforma de alojamiento de aplicaciones web | Publica la app con un link HTTPS para compañeros, docentes y participantes |
@@ -387,6 +388,42 @@ convierte en un código compacto (`P01`), igual en el navegador y en el servidor
 quedará antes de guardar. Si el código ya existe, el sistema reconoce a quien vuelve y continúa su avance.
 No se piden nombres ni datos personales.
 
+### 5.12 Registro de evidencias y Excel — `shared/evidence.ts`, `server/evidence.ts`
+
+```ts
+// Navegador: al tener lista la respuesta (antes de hablar), se registra la orden.
+logTurn({ recognizedBy: "local", intent: local.kind, completed: local.kind !== "decline" });
+// → tiempo de respuesta = performance.now() − momento en que se reconoció la frase
+
+// Servidor: la tarea y la "ayuda" se calculan con las mismas reglas para todas las personas.
+task: taskFor(input.intent),                 // "select_option" → "Responder evaluación"
+helpNeeded: HELP_INTENTS.includes(input.intent),
+heard: redactHeard(input.heard),             // frases con contraseñas → "[omitido por privacidad]"
+```
+
+**Qué hace:** cada orden dicha o escrita a Jason se guarda en la tabla `voice_events`, **sin audio**, con
+los indicadores de la ficha de observación:
+
+| Columna | Indicador |
+|---|---|
+| `heard`, `inputMode` | Comando emitido y medio (voz o texto) |
+| `asrConfidence` | Confianza del reconocimiento de voz (0 a 1), si el navegador la informa |
+| `recognizedBy`, `intent` | Comando reconocido: quién lo resolvió (local, IA, código, confirmación, no entendido) y la intención |
+| `task`, `completed` | Tarea de la ficha y si se completó |
+| `responseMs` | Tiempo de respuesta en milisegundos |
+| `helpNeeded` | Si pidió ayuda o que repita |
+| `sessionId` | Visita del navegador. Las órdenes previas al ingreso se asignan a quien ingresó en esa sesión |
+
+El panel docente descarga un **Excel** generado con ExcelJS, con cuatro hojas:
+
+- **Resumen por participante:** comandos emitidos y reconocidos (%), confianza media, tareas completadas
+  (%), tiempos medios (general, local y con IA), ayudas, pretest, postest y diferencia.
+- **Registro de interacciones:** una fila por orden, con fecha y hora de Lima.
+- **Evaluaciones.**
+- **Definiciones:** cómo se calcula cada indicador.
+
+Estos son los datos del OE3 (funcionamiento: reconocimiento, tareas y tiempos).
+
 ## 6. Relación con el marco teórico
 
 | Concepto | Definición breve | Dónde está en el prototipo |
@@ -445,10 +482,14 @@ No se piden nombres ni datos personales.
 - **Solo el código y el avance llegan a la IA** (desde la Fase 1). Ni siquiera los datos escolares de
   registros antiguos se envían; una prueba automática lo verifica.
 - El ingreso no pide nombres, correos, edad ni otros datos personales: solo un código que la persona crea.
+- **Registro de evidencias (Fase 4):** se guarda el **texto** de cada orden dicha a Jason (no el audio), con
+  el código de participante y los tiempos. Las frases que mencionan contraseñas se guardan como
+  "[omitido por privacidad]". Conviene pedir a los participantes que no digan datos personales al hablar
+  con Jason, e informarlo en el consentimiento.
 
 ## 9. Pruebas automáticas
 
-Se ejecutan con `pnpm test`. Estado actual: **14 archivos, 58 pruebas, todas aprobadas**.
+Se ejecutan con `pnpm test`. Estado actual: **15 archivos, 64 pruebas, todas aprobadas**.
 
 | Archivo | Qué verifica |
 |---|---|
@@ -462,6 +503,7 @@ Se ejecutan con `pnpm test`. Estado actual: **14 archivos, 58 pruebas, todas apr
 | `server/question.speech.test.ts` | Lectura breve de preguntas, opciones y avance |
 | `server/barge.in.test.ts` | Interrupción por voz: filtro de eco y palabras que detienen la lectura |
 | `server/hands.free.test.ts` | Bienvenida, código dictado en el ingreso y nombres de los controles |
+| `server/evidence.test.ts` | Registro de evidencias: tareas, privacidad, indicadores por participante y Excel (se genera y se vuelve a abrir); solo el docente lo descarga |
 | `server/no.manus.test.ts` | Independencia de Manus: no quedan referencias en el código |
 | `server/database.config.test.ts` | Base de datos local (SQLite) o en la nube (Turso) según `DATABASE_URL` |
 | `server/admin.credentials.test.ts`, `server/admin.students.test.ts` | Acceso al panel docente (incluido el aviso si no está configurado) y gestión de participantes |
@@ -628,3 +670,28 @@ con ngrok) por la publicación en la nube.
   - "pe cero siete" → "no" → "pe cero ocho" → "sí" entra con P08 y abre el diagnóstico;
   - no hay errores en la consola.
 - **Pendiente:** el recorrido completo con micrófono lo prueba el autor.
+
+### Fase 4 (partes A y C) — Registro automático de evidencias y Excel
+
+**Objetivo:** generar los datos del OE3 (reconocimiento, tareas y tiempos) sin trabajo manual y sin grabar
+audio.
+
+**Cambios:**
+
+- **Tabla `voice_events`** y registro de cada orden con sus indicadores. Se mide el tiempo desde que se
+  reconoce la frase hasta que la respuesta está lista, y se guarda la confianza del reconocedor de voz.
+- **Reglas comunes** (`shared/evidence.ts`): tarea según la intención, qué cuenta como reconocido, qué
+  cuenta como ayuda, y privacidad de las frases con contraseñas.
+- **Excel de evidencias** en el panel docente, generado con ExcelJS.
+- **Guía de evidencias del TIF** (`docs/GUIA_EVIDENCIAS.md`) y **QR** de la app (`docs/qr-aula-ia.png`).
+- **Pendiente (parte B):** cuestionario Likert por voz. Se cargará cuando el grupo entregue los ítems.
+
+**Verificación:**
+
+- `pnpm check` sin errores.
+- `pnpm test`: 64 de 64 pruebas aprobadas.
+- **Prueba en navegador (Chromium):**
+  1. un participante ingresa por voz ("pe cero cinco") y usa el pretest;
+  2. el docente inicia sesión y descarga el Excel;
+  3. el archivo tiene las 4 hojas, los indicadores correctos y la frase con contraseña omitida;
+  4. no hay errores en la consola.

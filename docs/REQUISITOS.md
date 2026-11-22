@@ -3,7 +3,7 @@
 **Proyecto:** Asistente de voz con inteligencia artificial para capacitación de personas con discapacidad
 visual y motriz, Lima, 2026 (TIF Nivel II, UCV).
 **Objetivo específico que atiende:** OE1. Identificar los requisitos funcionales y de accesibilidad.
-**Estado:** actualizado al cierre de la Fase 2. Se revisa al cerrar cada fase.
+**Estado:** actualizado en la Fase 4 (partes A y C). Se revisa al cerrar cada fase.
 
 **Leyenda de estado** (verificado en el código de la rama `main`): ✅ cumplido · 🟡 parcial · ⬜ pendiente.
 
@@ -54,9 +54,9 @@ Compromiso" indica el principio; "ISO 9241-11" indica la dimensión de usabilida
 | RF-14 | Anunciar por voz los cambios de pantalla, los resultados de cada acción y los errores | 4.1.3, 3.3.1 | Representación | Eficacia | 2, 3 | ✅ Fase 2: anuncia cada pantalla nueva; en el ingreso pregunta el código y en una evaluación lee la primera pregunta |
 | RF-15 | Comandos locales deterministas que funcionan sin IA ni red (respaldo si la IA falla) | — | Acción y expresión | Eficacia | 2 | ✅ |
 | RF-16 | Modo alternativo de teclado y texto siempre disponible | 2.1.1, 2.1.2 | Acción y expresión (múltiples medios) | Eficacia | todas | ✅ |
-| RF-17 | Registrar, **sin audio**, por participante y sesión: comando emitido, comando reconocido (local o IA), intención, tarea, si se completó, tiempo de respuesta (ms) y si necesitó ayuda | — | — | Eficacia, eficiencia (indicadores de la ficha de observación) | 4 | ⬜ |
+| RF-17 | Registrar, **sin audio**, por participante y sesión: comando emitido, comando reconocido (local o IA), intención, tarea, si se completó, tiempo de respuesta (ms) y si necesitó ayuda | — | — | Eficacia, eficiencia (indicadores de la ficha de observación) | 4 | ✅ Fase 4: tabla `voice_events`, con la confianza del reconocimiento como indicador adicional |
 | RF-18 | Cuestionario Likert **configurable desde un archivo** (12 o 15 ítems, dimensiones editables), leído y respondido por voz | 2.1.1, 3.3.2 | Acción y expresión | Satisfacción | 4 | ⬜ |
-| RF-19 | Panel docente con resultados por indicador y dimensión, y exportación a Excel/CSV | 1.3.1 | — | (análisis de los tres indicadores) | 4 | 🟡 panel y exportación CSV; faltan indicadores y Excel |
+| RF-19 | Panel docente con resultados por indicador y dimensión, y exportación a Excel/CSV | 1.3.1 | — | (análisis de los tres indicadores) | 4 | 🟡 Fase 4: Excel con indicadores por participante y definiciones; falta el resultado del Likert (RF-18) |
 
 ## 4. Requisitos no funcionales (RNF)
 
@@ -70,7 +70,7 @@ Compromiso" indica el principio; "ISO 9241-11" indica la dimensión de usabilida
 | RNF-06 | **Seguridad del agente:** la IA solo devuelve acciones de una lista cerrada que el servidor valida; nunca se ejecuta código arbitrario; las claves de la IA solo existen en el servidor | ISO/IEC 25010 seguridad (integridad) | 1, 3 | ✅ |
 | RNF-07 | Compatibilidad: Chrome y Edge de escritorio, y Chrome en Android | WCAG 4.1.2; ISO/IEC 25010 compatibilidad | 5 | 🟡 probado en Chrome/Edge de escritorio |
 | RNF-08 | Publicación con un link **HTTPS** en internet, sin depender de la PC del autor (el navegador solo permite el micrófono en sitios seguros) | ISO/IEC 25010 flexibilidad | 5 | ✅ publicada en https://aula-ia-cientifica.onrender.com (Render + Turso) |
-| RNF-09 | Tiempo de respuesta: comandos locales en menos de 1 s; comandos con IA medidos en cada interacción (meta propuesta: 5 s o menos, a validar en el piloto) | ISO 9241-11 eficiencia; ISO/IEC 25010 eficiencia de desempeño | 4 | ⬜ se medirá en la Fase 4 |
+| RNF-09 | Tiempo de respuesta: comandos locales en menos de 1 s; comandos con IA medidos en cada interacción (meta propuesta: 5 s o menos, a validar en el piloto) | ISO 9241-11 eficiencia; ISO/IEC 25010 eficiencia de desempeño | 4 | 🟡 se mide en cada interacción (Excel); la meta se valida en el piloto |
 | RNF-10 | Conformidad con **WCAG 2.2 nivel AA**: contraste mínimo, foco visible y no oculto, tamaño mínimo de los objetivos, etiquetas que coinciden con el nombre accesible | WCAG 1.4.3, 1.4.11, 2.4.7, 2.4.11, 2.5.3, 2.5.8 | 6 | ⬜ |
 | RNF-11 | Proveedor de IA configurable por `.env` (Google Gemini gratuito por defecto; opción de pago a futuro) | ISO/IEC 25010 mantenibilidad (modificabilidad) | 1 | ✅ |
 | RNF-12 | Funciona en Windows (scripts con `cross-env`) y guarda los datos en una base SQLite local | ISO/IEC 25010 flexibilidad (instalabilidad) | 0, 5 | ✅ |

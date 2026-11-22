@@ -36,7 +36,8 @@ export type SpeechStatus = "idle" | "listening" | "speaking";
 export type ListenOptions = {
   /** Sigue escuchando frase tras frase (se usa para la palabra de activación). */
   continuous?: boolean;
-  onResult: (text: string) => void;
+  /** confidence: de 0 a 1, si el navegador la informa (sirve como indicador de reconocimiento). */
+  onResult: (text: string, confidence?: number) => void;
   /** Se llama si terminó sin captar ninguna frase (silencio o error). */
   onSilence?: (reason: "no-speech" | "error" | "not-allowed") => void;
 };
@@ -333,7 +334,8 @@ export function useSpeech() {
             if (text.trim()) {
               heardSomething = true;
               setTranscript(text.trim());
-              onResult(text.trim());
+              const confidence = result[0]?.confidence;
+              onResult(text.trim(), confidence > 0 ? confidence : undefined);
             }
           } else interim += text;
         }

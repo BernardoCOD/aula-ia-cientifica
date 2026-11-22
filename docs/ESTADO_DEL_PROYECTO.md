@@ -9,14 +9,16 @@
 (panel docente: `/docente`). Los Logs del 21 de noviembre confirman Gemini, el panel docente y la base de
 datos en la nube (`aula-ia-bernardocod.aws-us-east-1.turso.io`).
 
-**Fase 2 (uso sin manos) terminada el 22 de noviembre.** Bernardo probó el paso 1 (lectura breve e
-interrupción por voz) y le pareció perfecto. **Falta que pruebe el paso 2 con micrófono:**
+**En curso: Fase 4 (evidencias para el TIF).** Bernardo decidió pasar de la Fase 2 a la 4; la Fase 3 queda
+para después.
 
-- la bienvenida hablada (o el aviso "Toca la pantalla para activar la voz");
-- el ingreso guiado ("quiero empezar" → "pe cero uno" → "sí");
-- "siguiente", "anterior" y "activar".
-
-**Siguiente:** Fase 3 (plan abajo), esperando el "ok" de Bernardo.
+- ✅ **Parte A:** registro automático de cada orden (sin audio).
+- ✅ **Parte C:** Excel de evidencias en el panel docente.
+- ✅ Guía de evidencias (`docs/GUIA_EVIDENCIAS.md`) y QR de la app (`docs/qr-aula-ia.png`).
+- ⏳ **Parte B, cuestionario Likert por voz:** esperando que el grupo entregue los ítems (12 o 15, con su
+  dimensión y escala) y, si existe, la ficha de observación con la lista de tareas.
+- ❓ **Pull request** para unir la rama de trabajo con `main`: se le explicó a Bernardo qué es. Crearlo
+  solo cuando él lo pida.
 
 ## Lo que ya está hecho
 
@@ -26,7 +28,8 @@ interrupción por voz) y le pareció perfecto. **Falta que pruebe el paso 2 con 
 | 1. Independizar de Manus y participantes adultos | ✅ Sin Manus; ingreso solo con código de participante ("pe cero uno" → P01); a la IA solo llegan el código y el avance |
 | 5. Publicar (adelantada, en la nube) | ✅ Publicada en https://aula-ia-cientifica.onrender.com con Render + Turso |
 | 2. Uso sin manos | ✅ Lectura breve, interrupción por voz, bienvenida, ingreso guiado y "siguiente / anterior / activar" |
-| 3, 4, 6 | ⬜ Pendientes |
+| 4. Evidencias para el TIF | 🟡 Registro y Excel listos; falta el cuestionario Likert (parte B) |
+| 3 y 6 | ⬜ Pendientes |
 
 Verificación al cierre: `pnpm check` sin errores y `pnpm test` con 42 de 42 pruebas aprobadas.
 

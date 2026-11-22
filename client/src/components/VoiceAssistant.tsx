@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { TRPCClientError } from "@trpc/client";
 import type { AgentAction, AgentReply, AgentTurn } from "@shared/assistant";
+import type { RecognizedBy } from "@shared/evidence";
 import { trpc } from "@/lib/trpc";
 import { useAssistantContext } from "@/contexts/AssistantContext";
 import { useSpeech } from "@/hooks/useSpeech";
@@ -68,13 +69,16 @@ type PendingConfirmation = {
   cancelSpeech?: string;
 };
 type HistoryItem = { you: string; assistant: string };
+/** Cómo llegó la orden: dicha (con la confianza del reconocedor) o escrita en el cuadro. */
+type UtteranceMeta = { via: "voz" | "texto"; confidence?: number };
+/** Orden en curso, para el registro de evidencias (tiempo desde que se reconoció la frase). */
+type Turn = UtteranceMeta & { text: string; route: string; startedAt: number };
 
 const TEXT_SIZE_KEY = "aula-ia-text-size";
 const ALWAYS_LISTEN_KEY = "aula-ia-always-listen";
 /** Una bienvenida por sesión del navegador (no en cada recarga de la página). */
 const WELCOMED_KEY = "aula-ia-welcomed";
 const EVALUATION_ROUTES = ["/diagnostico", "/postest"];
-
 const readSession = (key: string) => {
   try {
     return sessionStorage.getItem(key);
@@ -87,6 +91,20 @@ const writeSession = (key: string, value: string) => {
     sessionStorage.setItem(key, value);
   } catch {}
 };
+
+const SESSION_ID_KEY = "aula-ia-session-id";
+
+/** Identificador de la visita actual (agrupa las órdenes de una sesión en el registro). */
+function sessionId() {
+  let id = readSession(SESSION_ID_KEY);
+  if (!id) {
+    id = typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    writeSession(SESSION_ID_KEY, id);
+  }
+  return id;
+}
 const YES = /^(?:si|claro|confirmo|confirmar|adelante|dale|acepto|correcto|hazlo|de acuerdo|ok|okey|por supuesto)\b/;
 const NO = /^(?:no|cancela|cancelar|detente|olvidalo|negativo|mejor no|todavia no)\b/;
 
@@ -159,7 +177,36 @@ export function VoiceAssistant() {
   const silenceCountRef = useRef(0);
   const greetedRef = useRef(false);
   const selfNavigationRef = useRef(0);
-  const handleRef = useRef<(text: string) => void>(() => undefined);
+  const handleRef = useRef<(text: string, meta?: UtteranceMeta) => void>(() => undefined);
+  const logEvent = trpc.student.logEvent.useMutation();
+  const logEventRef = useRef(logEvent.mutate);
+  logEventRef.current = logEvent.mutate;
+  const turnRef = useRef<Turn | null>(null);
+
+  /**
+   * Evidencias del TIF: registra la orden en curso con su resultado. Se llama una sola vez por orden,
+   * cuando la respuesta está lista (antes de hablar). Si falla, la app sigue igual.
+   */
+  const logTurn = useCallback(
+    (outcome: { recognizedBy: RecognizedBy; intent: string; completed: boolean }) => {
+      const turn = turnRef.current;
+      if (!turn) return;
+      turnRef.current = null;
+      logEventRef.current({
+        sessionId: sessionId(),
+        studentCode: getStudent()?.code,
+        route: turn.route,
+        inputMode: turn.via,
+        heard: turn.text.slice(0, 500),
+        asrConfidence: turn.confidence,
+        recognizedBy: outcome.recognizedBy,
+        intent: outcome.intent.slice(0, 80),
+        completed: outcome.completed,
+        responseMs: Math.min(600_000, Math.round(performance.now() - turn.startedAt)),
+      });
+    },
+    []
+  );
   /** Último control elegido con "siguiente" o "anterior" (algunos no reciben el foco del navegador). */
   const lastFocusedRef = useRef<HTMLElement | null>(null);
 
@@ -194,7 +241,7 @@ export function VoiceAssistant() {
         setOpen(true);
         silenceCountRef.current = 0;
         const command = match[1]?.trim();
-        if (command) handleRef.current(command);
+        if (command) handleRef.current(command, { via: "voz" });
         else if (!greetedRef.current) {
           greetedRef.current = true;
           respondRef.current(`Hola, soy ${ASSISTANT_NAME}. ¿En qué te ayudo?`);
@@ -206,7 +253,7 @@ export function VoiceAssistant() {
   const listenForCommand = useCallback(() => {
     if (!speech.recognitionSupported) return;
     speech.listen({
-      onResult: text => handleRef.current(text),
+      onResult: (text, confidence) => handleRef.current(text, { via: "voz", confidence }),
       onSilence: reason => {
         if (modeRef.current !== "conversation") return;
         if (reason === "not-allowed") {
@@ -254,7 +301,7 @@ export function VoiceAssistant() {
           modeRef.current === "conversation"
             ? (heard: string) => {
                 silenceCountRef.current = 0;
-                if (heard) handleRef.current(heard);
+                if (heard) handleRef.current(heard, { via: "voz" });
                 else resumeListening();
               }
             : undefined;
@@ -625,6 +672,7 @@ export function VoiceAssistant() {
         });
       } catch (error) {
         setBusy(false);
+        logTurn({ recognizedBy: "ia", intent: "error", completed: false });
         respond(
           error instanceof TRPCClientError && error.message
             ? error.message
@@ -635,7 +683,10 @@ export function VoiceAssistant() {
         setBusy(false);
       }
 
+      // Intención para el registro: las acciones que eligió la IA, o "respuesta" si solo respondió.
+      const intent = reply.actions.map(action => action.type).join(",") || "respuesta";
       if (simulationRef.current) {
+        logTurn({ recognizedBy: "ia", intent: "simulation", completed: true });
         const described = reply.actions.map(describeAction);
         setSimulationLog([
           `Orden: ${text}`,
@@ -661,6 +712,7 @@ export function VoiceAssistant() {
           ? `¿Confirmas que quieres pulsar «${accessibleName(elementById(riskyClick.target)!)}»?`
           : "");
       if (confirmation && reply.actions.length) {
+        logTurn({ recognizedBy: "ia", intent, completed: true });
         setPending({ question: confirmation, actions: reply.actions, speech: reply.speech });
         rememberTurn("assistant", confirmation);
         respond(`${confirmation} Di sí o no.`);
@@ -674,20 +726,22 @@ export function VoiceAssistant() {
         return runAgent(text, step + 1, [...previousResults, ...results]);
       }
       rememberTurn("assistant", failed ? results.join("; ") : reply.speech);
+      logTurn({ recognizedBy: "ia", intent, completed: !failed });
       await finishReply(reply, results, failed, readMode);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [agent, currentSnapshot, executeActions, finishReply, respond, say, setPending]
+    [agent, currentSnapshot, executeActions, finishReply, logTurn, respond, say, setPending]
   );
 
   // ---- Punto de entrada de cada frase -------------------------------------------------------
 
   const handleUtterance = useCallback(
-    (raw: string) => {
+    (raw: string, meta: UtteranceMeta = { via: "voz" }) => {
       // "Oye Jason, abre el módulo dos" en plena conversación: se atiende solo la orden.
       const wake = WAKE_PATTERN.exec(normalizeSpeech(raw));
       const text = wake?.[1]?.trim() ? wake[1].trim() : raw.trim();
       if (!text) return;
+      turnRef.current = { ...meta, text, route: locationRef.current, startedAt: performance.now() };
       silenceCountRef.current = 0;
       lastUserTextRef.current = text;
       setOpen(true);
@@ -698,26 +752,30 @@ export function VoiceAssistant() {
         if (YES.test(normalized)) {
           setPending(null);
           if (confirmation.run) {
+            logTurn({ recognizedBy: "confirmacion", intent: "confirmar_si", completed: true });
             confirmation.run();
             respond(confirmation.speech);
             return;
           }
           rememberTurn("user", text);
-          void executeActions(confirmation.actions).then(({ results, failed, readMode }) =>
-            finishReply(
+          void executeActions(confirmation.actions).then(({ results, failed, readMode }) => {
+            logTurn({ recognizedBy: "confirmacion", intent: "confirmar_si", completed: !failed });
+            return finishReply(
               { speech: confirmation.speech, actions: [], confirm: "", continue: false },
               results,
               failed,
               readMode
-            )
-          );
+            );
+          });
           return;
         }
         if (NO.test(normalized)) {
           setPending(null);
+          logTurn({ recognizedBy: "confirmacion", intent: "confirmar_no", completed: true });
           respond(confirmation.cancelSpeech ?? "Entendido, no hice nada.");
           return;
         }
+        logTurn({ recognizedBy: "no_entendido", intent: "confirmacion", completed: false });
         respond(`${confirmation.question} Responde sí o no.`);
         return;
       }
@@ -737,14 +795,17 @@ export function VoiceAssistant() {
           run: () => handlersRef.current.onParticipantCode?.(code),
           cancelSpeech: `De acuerdo. ${CODE_QUESTION}`,
         });
+        logTurn({ recognizedBy: "codigo", intent: "codigo_dictado", completed: true });
         respond(`${question} Di sí o no.`);
         return;
       }
       if (local) {
+        logTurn({ recognizedBy: "local", intent: local.kind, completed: local.kind !== "decline" });
         runLocal(local);
         return;
       }
       if (!aiReady) {
+        logTurn({ recognizedBy: "ia_no_disponible", intent: "sin_ia", completed: false });
         respond(AI_UNAVAILABLE_MESSAGE);
         return;
       }
@@ -752,7 +813,7 @@ export function VoiceAssistant() {
       void runAgent(text);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [aiReady, executeActions, finishReply, respond, runAgent, runLocal, setPending]
+    [aiReady, executeActions, finishReply, logTurn, respond, runAgent, runLocal, setPending]
   );
   handleRef.current = handleUtterance;
 
@@ -899,7 +960,7 @@ export function VoiceAssistant() {
   const handleTypedSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!typed.trim()) return;
-    handleUtterance(typed);
+    handleUtterance(typed, { via: "texto" });
     setTyped("");
   };
 

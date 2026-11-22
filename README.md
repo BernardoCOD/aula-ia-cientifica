@@ -82,6 +82,18 @@ al iniciar la app. Guarda participantes (solo su código), progreso por módulo,
 actividades, retos, interacciones con el Tutor IA y consultas. Para verla con una interfaz gráfica:
 `npx pnpm@10.4.1 db:studio`. Para empezar de cero, borra la carpeta `data/`.
 
+## Evidencias para el TIF
+
+- **Registro automático (sin audio):** cada orden dicha o escrita a Jason se guarda con:
+  - lo que se dijo y si fue por voz o por texto;
+  - la confianza del reconocimiento;
+  - quién la resolvió (comando local, IA, código o confirmación);
+  - la tarea, si se completó, el tiempo de respuesta y si se pidió ayuda.
+- **Excel del panel docente** (`/docente` → **Descargar Excel de evidencias**), con cuatro hojas: resumen por
+  participante, registro de interacciones, evaluaciones y definiciones de cada indicador.
+- **Guía para reunir capturas, video y anexos:** [`docs/GUIA_EVIDENCIAS.md`](docs/GUIA_EVIDENCIAS.md), con el
+  QR de la app (`docs/qr-aula-ia.png`).
+
 ## El asistente de voz
 
 **Cómo activarlo: solo con la voz**

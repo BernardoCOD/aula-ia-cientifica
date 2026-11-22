@@ -2,6 +2,7 @@ import {
   BarChart3,
   BrainCircuit,
   Download,
+  FileSpreadsheet,
   Filter,
   LockKeyhole,
   LogIn,
@@ -33,6 +34,23 @@ export default function Admin() {
   const [responseFilter, setResponseFilter] = useState("Todas");
   const [selectedResponse, setSelectedResponse] = useState<number | null>(null);
   const analysis = trpc.admin.analyzeResponse.useMutation();
+  const excel = trpc.admin.exportExcel.useMutation();
+
+  /** Descarga el Excel de evidencias del TIF (lo arma el servidor con todos los registros). */
+  const exportExcel = async () => {
+    const file = await excel.mutateAsync();
+    const bytes = Uint8Array.from(atob(file.base64), char => char.charCodeAt(0));
+    const url = URL.createObjectURL(
+      new Blob([bytes], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      })
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = file.filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (loading)
     return (
@@ -146,12 +164,31 @@ export default function Admin() {
               tomar decisiones pedagógicas.
             </p>
           </div>
-          <button
-            onClick={exportCsv}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#cbd5e1] bg-white px-4 py-3 text-sm font-bold text-[#334155] hover:bg-[#f8fafc]"
-          >
-            <Download size={17} /> Exportar resultados
-          </button>
+          <div className="flex flex-col items-stretch gap-2 sm:items-end">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => void exportExcel().catch(() => undefined)}
+                disabled={excel.isPending}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#172554] px-4 py-3 text-sm font-bold text-white hover:bg-[#26356b] disabled:cursor-wait disabled:opacity-70"
+              >
+                <FileSpreadsheet size={17} />
+                {excel.isPending ? "Preparando Excel…" : "Descargar Excel de evidencias"}
+              </button>
+              <button
+                onClick={exportCsv}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#cbd5e1] bg-white px-4 py-3 text-sm font-bold text-[#334155] hover:bg-[#f8fafc]"
+              >
+                <Download size={17} /> Exportar CSV
+              </button>
+            </div>
+            <p role="status" className="text-xs text-[#64748b]">
+              {excel.isError
+                ? "No se pudo preparar el Excel. Inténtalo otra vez."
+                : excel.data
+                  ? `Descargado: ${excel.data.participants} participantes, ${excel.data.events} interacciones.`
+                  : "Resumen por participante, registro de interacciones, evaluaciones y definiciones."}
+            </p>
+          </div>
         </div>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat

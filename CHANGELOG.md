@@ -3,6 +3,20 @@
 Cambios del prototipo Aula IA Científica, de lo más reciente a lo más antiguo. El detalle técnico de cada
 fase está en [`docs/DOCUMENTACION_TECNICA.md`](docs/DOCUMENTACION_TECNICA.md).
 
+## Fase 4, partes A y C — Evidencias automáticas y Excel (2026-11-22)
+
+### Agregado
+- **Registro automático de cada orden al asistente (sin audio):**
+  - lo que se dijo, el medio (voz o texto) y la confianza del reconocimiento;
+  - quién la resolvió (comando local, IA, código o confirmación) y la intención;
+  - la tarea, si se completó, el tiempo de respuesta (ms) y si se pidió ayuda.
+- **Excel de evidencias en el panel docente:** resumen por participante, registro de interacciones,
+  evaluaciones y definiciones de cada indicador.
+- **Guía de evidencias del TIF** (`docs/GUIA_EVIDENCIAS.md`) y **código QR** de la app.
+
+### Privacidad
+- Las frases que mencionan contraseñas o claves se guardan como "[omitido por privacidad]".
+
 ## Fase 2, paso 2 — Bienvenida, ingreso guiado y recorrido de controles (2026-11-22)
 
 ### Agregado

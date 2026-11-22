@@ -40,6 +40,7 @@ import {
 } from "./adminAuth";
 import { TRPCError } from "@trpc/server";
 import { normalizeParticipantCode } from "@shared/participant";
+import { buildEvidenceWorkbook, saveVoiceEvent, voiceEventInputSchema } from "./evidence";
 
 /** Convierte los errores del servicio de IA en mensajes comprensibles que el asistente puede leer. */
 function aiErrorMessage(error: unknown) {
@@ -111,6 +112,10 @@ export const appRouter = router({
           });
         return upsertStudent({ code });
       }),
+    /** Evidencias del TIF: una interacción con el asistente (sin audio). Nunca interrumpe a la app. */
+    logEvent: publicProcedure
+      .input(voiceEventInputSchema)
+      .mutation(({ input }) => saveVoiceEvent(input).catch(() => ({ saved: false }))),
     dashboard: publicProcedure
       .input(z.object({ code: studentCode }))
       .query(({ input }) => getStudentDashboard(input.code)),
@@ -368,6 +373,8 @@ export const appRouter = router({
         )
       ),
     consultations: teacherProcedure.query(() => getRecentConsultations()),
+    /** Excel con los indicadores del TIF (resumen, registro, evaluaciones y definiciones). */
+    exportExcel: teacherProcedure.mutation(() => buildEvidenceWorkbook()),
   }),
 });
 
