@@ -27,6 +27,12 @@ import { useSpeech } from "@/hooks/useSpeech";
 import { getStudent } from "@/lib/student";
 import { spokenOption, spokenOptions, spokenProgress, spokenQuestion } from "@/lib/questionSpeech";
 import {
+  CODE_QUESTION,
+  describeControl,
+  spokenCodeCandidate,
+  welcomeMessage,
+} from "@/lib/handsFree";
+import {
   AI_UNAVAILABLE_MESSAGE,
   ASSISTANT_NAME,
   HELP_MESSAGE,
@@ -46,6 +52,7 @@ import {
 import {
   executeAction,
   isRiskyElement,
+  realClick,
   waitForPageToSettle,
   type ActionEnvironment,
 } from "@/lib/pageActions";
@@ -57,11 +64,29 @@ type PendingConfirmation = {
   speech: string;
   /** Acción local a ejecutar al confirmar (por ejemplo, enviar la evaluación). */
   run?: () => void;
+  /** Qué decir si la persona responde que no (por defecto: "Entendido, no hice nada."). */
+  cancelSpeech?: string;
 };
 type HistoryItem = { you: string; assistant: string };
 
 const TEXT_SIZE_KEY = "aula-ia-text-size";
 const ALWAYS_LISTEN_KEY = "aula-ia-always-listen";
+/** Una bienvenida por sesión del navegador (no en cada recarga de la página). */
+const WELCOMED_KEY = "aula-ia-welcomed";
+const EVALUATION_ROUTES = ["/diagnostico", "/postest"];
+
+const readSession = (key: string) => {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const writeSession = (key: string, value: string) => {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {}
+};
 const YES = /^(?:si|claro|confirmo|confirmar|adelante|dale|acepto|correcto|hazlo|de acuerdo|ok|okey|por supuesto)\b/;
 const NO = /^(?:no|cancela|cancelar|detente|olvidalo|negativo|mejor no|todavia no)\b/;
 
@@ -119,6 +144,8 @@ export function VoiceAssistant() {
   const [simulation, setSimulation] = useState(false);
   const [simulationLog, setSimulationLog] = useState<string[]>([]);
   const [alwaysListen, setAlwaysListen] = useState(() => readStorage(ALWAYS_LISTEN_KEY) !== "0");
+  /** El navegador bloqueó la voz: hace falta que la persona toque la pantalla una vez. */
+  const [needsTap, setNeedsTap] = useState(false);
 
   // Refs: los callbacks de voz se ejecutan fuera del ciclo de React y necesitan el valor actual.
   const modeRef = useRef<ListeningMode>("off");
@@ -133,6 +160,8 @@ export function VoiceAssistant() {
   const greetedRef = useRef(false);
   const selfNavigationRef = useRef(0);
   const handleRef = useRef<(text: string) => void>(() => undefined);
+  /** Último control elegido con "siguiente" o "anterior" (algunos no reciben el foco del navegador). */
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
 
   screenRef.current = screenContext;
   locationRef.current = location;
@@ -214,7 +243,7 @@ export function VoiceAssistant() {
   // ---- Hablar --------------------------------------------------------------------------------
 
   const say = useCallback(
-    (text: string) =>
+    (text: string, onBlocked?: () => void) =>
       new Promise<void>(resolve => {
         if (!text) return resolve();
         lastSpokenRef.current = text;
@@ -229,7 +258,7 @@ export function VoiceAssistant() {
                 else resumeListening();
               }
             : undefined;
-        speech.speak(text, resolve, onBargeIn);
+        speech.speak(text, resolve, { onBargeIn, onBlocked });
       }),
     [speech, resumeListening]
   );
@@ -453,10 +482,17 @@ export function VoiceAssistant() {
           return respond(
             spokenProgress(screenRef.current.totalQuestions ?? 0, screenRef.current.unanswered ?? [])
           );
-        case "navigate":
-          envRef.current.navigate(command.path);
+        case "navigate": {
+          // "Quiero empezar" sin haber ingresado: primero se pide el código.
+          const path =
+            command.path === "/dashboard" && !getStudent() ? "/identificacion" : command.path;
+          envRef.current.navigate(path);
+          if (path === "/identificacion") {
+            window.setTimeout(() => respond(`Abrí el ingreso. ${CODE_QUESTION}`), 300);
+            return;
+          }
           // Al abrir una evaluación se lee directamente la primera pregunta, como en un examen oral.
-          if (command.path === "/diagnostico" || command.path === "/postest") {
+          if (EVALUATION_ROUTES.includes(path)) {
             window.setTimeout(() => {
               const screen = screenRef.current;
               respond(
@@ -468,6 +504,52 @@ export function VoiceAssistant() {
             return;
           }
           return respond(`Abrí ${command.label}.`);
+        }
+        case "focus_next":
+        case "focus_previous": {
+          const controls = currentSnapshot().elements.filter(
+            control => !control.state?.includes("deshabilitado")
+          );
+          if (!controls.length) return respond("No hay botones ni campos en esta pantalla.");
+          const elements = controls.map(control => elementById(control.id));
+          const active = document.activeElement;
+          let current = elements.findIndex(element => element === active);
+          if (current === -1) current = elements.findIndex(element => element === lastFocusedRef.current);
+          const step = command.kind === "focus_next" ? 1 : -1;
+          const index =
+            current === -1
+              ? step === 1 ? 0 : controls.length - 1
+              : (current + step + controls.length) % controls.length;
+          const target = elements[index];
+          if (target) {
+            lastFocusedRef.current = target;
+            target.scrollIntoView({ block: "center", behavior: "smooth" });
+            target.focus({ preventScroll: true });
+          }
+          return respond(describeControl(controls[index]));
+        }
+        case "activate_focused": {
+          const active = document.activeElement;
+          const element =
+            active instanceof HTMLElement && active !== document.body && !active.closest("[data-voice-assistant]")
+              ? active
+              : lastFocusedRef.current;
+          if (!element?.isConnected)
+            return respond("Primero elige un control: di siguiente para recorrerlos.");
+          const name = accessibleName(element);
+          if (
+            (element instanceof HTMLInputElement && !["checkbox", "radio", "submit", "button"].includes(element.type)) ||
+            element instanceof HTMLTextAreaElement
+          )
+            return respond(`Es el campo ${name}. Dicta lo que quieres escribir.`);
+          if (isRiskyElement(element)) {
+            const question = `¿Confirmas que quieres pulsar ${name}?`;
+            setPending({ question, actions: [], speech: "", run: () => realClick(element) });
+            return respond(`${question} Di sí o no.`);
+          }
+          realClick(element);
+          return respond(`Listo: ${name}.`);
+        }
         case "back":
           envRef.current.goBack();
           return respond("Volví a la pantalla anterior.");
@@ -633,7 +715,7 @@ export function VoiceAssistant() {
         }
         if (NO.test(normalized)) {
           setPending(null);
-          respond("Entendido, no hice nada.");
+          respond(confirmation.cancelSpeech ?? "Entendido, no hice nada.");
           return;
         }
         respond(`${confirmation.question} Responde sí o no.`);
@@ -643,6 +725,21 @@ export function VoiceAssistant() {
       const local = interpretLocalCommand(text, {
         inQuestion: Boolean(screenRef.current.currentQuestion),
       });
+      // Pantalla de ingreso: un código dictado ("pe cero uno") se confirma antes de entrar.
+      const code =
+        !local && locationRef.current === "/identificacion" ? spokenCodeCandidate(text) : null;
+      if (code) {
+        const question = `Entendí ${code.split("").join(" ")}. ¿Es correcto?`;
+        setPending({
+          question,
+          actions: [],
+          speech: "",
+          run: () => handlersRef.current.onParticipantCode?.(code),
+          cancelSpeech: `De acuerdo. ${CODE_QUESTION}`,
+        });
+        respond(`${question} Di sí o no.`);
+        return;
+      }
       if (local) {
         runLocal(local);
         return;
@@ -710,12 +807,48 @@ export function VoiceAssistant() {
     }
   }, [listenForWakeWord, say, setMode, speech]);
 
-  // Activación por voz: queda atenta a "Oye Jason" desde que carga la página, sin tocar nada.
-  useEffect(() => {
+  const listenForWakeIfEnabled = useCallback(() => {
     if (alwaysListenRef.current && speech.recognitionSupported) {
       setMode("wake");
       listenForWakeWord();
+    } else setMode("off");
+  }, [listenForWakeWord, setMode, speech.recognitionSupported]);
+
+  /**
+   * Bienvenida hablada (una vez por sesión del navegador). Después queda escuchando una orden, sin
+   * que la persona toque nada. Si el navegador bloquea la voz hasta el primer toque, se muestra el
+   * aviso "Toca la pantalla" y, mientras tanto, sigue atento a "Oye Jason".
+   */
+  const welcome = useCallback(() => {
+    writeSession(WELCOMED_KEY, "1");
+    greetedRef.current = true;
+    setNeedsTap(false);
+    setOpen(true);
+    if (speech.recognitionSupported) setMode("conversation");
+    const text =
+      locationRef.current === "/identificacion"
+        ? `Hola, soy ${ASSISTANT_NAME}, tu asistente de voz. ${CODE_QUESTION}`
+        : welcomeMessage(getStudent()?.code);
+    void say(text, () => {
+      writeSession(WELCOMED_KEY, "");
+      setNeedsTap(true);
+      listenForWakeIfEnabled();
+    }).then(resumeListening);
+  }, [listenForWakeIfEnabled, resumeListening, say, setMode, speech.recognitionSupported]);
+
+  const skipVoice = () => {
+    writeSession(WELCOMED_KEY, "1");
+    setNeedsTap(false);
+  };
+
+  useEffect(() => {
+    if (readSession(WELCOMED_KEY) || !speech.synthesisSupported) {
+      // Ya hubo bienvenida en esta sesión: queda atenta a "Oye Jason", sin tocar nada.
+      listenForWakeIfEnabled();
+      return;
     }
+    const timer = window.setTimeout(welcome, 600);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -749,7 +882,16 @@ export function VoiceAssistant() {
     if (modeRef.current === "off" || Date.now() - selfNavigationRef.current < 4000) return;
     const timer = window.setTimeout(() => {
       const title = document.querySelector("main h1, h1")?.textContent?.trim();
-      if (title) respondRef.current(`Estás en: ${title}.`);
+      const screen = screenRef.current;
+      // Si Jason hace una pregunta, queda escuchando la respuesta sin pedir "Oye Jason".
+      const asks = location === "/identificacion" || (EVALUATION_ROUTES.includes(location) && screen.currentQuestion);
+      if (asks && modeRef.current === "wake" && speech.recognitionSupported) setMode("conversation");
+      if (location === "/identificacion")
+        respondRef.current(`Estás en el ingreso. ${CODE_QUESTION}`);
+      else if (EVALUATION_ROUTES.includes(location) && screen.currentQuestion)
+        // Al llegar a una evaluación (por ejemplo, después de ingresar) se lee la primera pregunta.
+        respondRef.current(`Estás en: ${title}. ${screen.totalQuestions} preguntas. ${readQuestion()}`);
+      else if (title) respondRef.current(`Estás en: ${title}.`);
     }, 700);
     return () => window.clearTimeout(timer);
   }, [location]);
@@ -778,6 +920,34 @@ export function VoiceAssistant() {
       <p className="sr-only" aria-live="polite">
         {lastResponse}
       </p>
+      {needsTap && (
+        // El navegador no deja hablar a la página hasta el primer toque: toda la pantalla es el botón.
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#172554]/45 p-5 sm:items-center">
+          <button
+            type="button"
+            autoFocus
+            onClick={welcome}
+            aria-label="Toca la pantalla para activar la voz de Jason"
+            className="absolute inset-0 h-full w-full cursor-pointer"
+          />
+          <div className="pointer-events-none relative w-full max-w-md rounded-3xl bg-white p-7 text-center shadow-lift">
+            <Volume2 className="mx-auto text-[#5b4bdb]" size={40} aria-hidden="true" />
+            <p className="mt-4 text-2xl font-bold text-[#26356b]">
+              Toca la pantalla para activar la voz
+            </p>
+            <p className="mt-2 text-[#4b686c]">
+              Jason, el asistente de voz, te guiará. Después podrás usar la app solo hablando.
+            </p>
+            <button
+              type="button"
+              onClick={skipVoice}
+              className="pointer-events-auto mt-5 text-sm font-bold text-[#5b4bdb] underline"
+            >
+              Usar sin voz
+            </button>
+          </div>
+        </div>
+      )}
       {open && (
         <section
           role="dialog"

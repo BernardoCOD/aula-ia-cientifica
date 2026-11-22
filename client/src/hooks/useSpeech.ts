@@ -41,6 +41,11 @@ export type ListenOptions = {
   onSilence?: (reason: "no-speech" | "error" | "not-allowed") => void;
 };
 
+export type SpeakOptions = {
+  onBargeIn?: (heard: string) => void;
+  onBlocked?: () => void;
+};
+
 const RATE_KEY = "aula-ia-speech-rate";
 const RECOGNITION_LANG = "es-PE";
 
@@ -235,11 +240,17 @@ export function useSpeech() {
   );
 
   /**
-   * Lee el texto en voz alta y llama a onDone al terminar. Con onBargeIn, la persona puede
-   * interrumpir hablando: entonces se llama onBargeIn (con lo que dijo) en lugar de onDone.
+   * Lee el texto en voz alta y llama a onDone al terminar.
+   * - onBargeIn: la persona puede interrumpir hablando; entonces se llama onBargeIn (con lo que dijo)
+   *   en lugar de onDone.
+   * - onBlocked: el navegador no deja hablar a la página hasta que la persona la toque una vez.
    */
   const speak = useCallback(
-    (text: string, onDone?: () => void, onBargeIn?: (heard: string) => void) => {
+    (
+      text: string,
+      onDone?: () => void,
+      { onBargeIn, onBlocked }: SpeakOptions = {}
+    ) => {
       stopListening();
       const token = ++speakTokenRef.current;
       if (!synthesisSupported() || !text.trim()) {
@@ -263,7 +274,17 @@ export function useSpeech() {
         if (voiceRef.current) utterance.voice = voiceRef.current;
         utterance.rate = rateRef.current;
         utterance.onend = () => next(index + 1);
-        utterance.onerror = () => next(index + 1);
+        utterance.onerror = event => {
+          if (event.error === "not-allowed" && token === speakTokenRef.current) {
+            speakTokenRef.current++;
+            stopListening();
+            setStatus("idle");
+            if (onBlocked) onBlocked();
+            else onDone?.();
+            return;
+          }
+          next(index + 1);
+        };
         window.speechSynthesis.speak(utterance);
       };
       next(0);

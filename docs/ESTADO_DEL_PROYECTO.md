@@ -9,12 +9,14 @@
 (panel docente: `/docente`). Los Logs del 21 de noviembre confirman Gemini, el panel docente y la base de
 datos en la nube (`aula-ia-bernardocod.aws-us-east-1.turso.io`).
 
-**En curso: Fase 2 (uso sin manos).**
+**Fase 2 (uso sin manos) terminada el 22 de noviembre.** Bernardo probó el paso 1 (lectura breve e
+interrupción por voz) y le pareció perfecto. **Falta que pruebe el paso 2 con micrófono:**
 
-- ✅ **Paso 1 (22 de noviembre):** lectura breve de evaluaciones, órdenes instantáneas e interrupción
-  hablando. **Bernardo debe probarlo** en el link con micrófono real y contar cómo le fue.
-- ⬜ **Paso 2:** bienvenida hablada al abrir, ingreso del código guiado por voz ("Entendí P01, ¿es
-  correcto?") y "siguiente / anterior / activar" para recorrer los botones.
+- la bienvenida hablada (o el aviso "Toca la pantalla para activar la voz");
+- el ingreso guiado ("quiero empezar" → "pe cero uno" → "sí");
+- "siguiente", "anterior" y "activar".
+
+**Siguiente:** Fase 3 (plan abajo), esperando el "ok" de Bernardo.
 
 ## Lo que ya está hecho
 
@@ -23,22 +25,23 @@ datos en la nube (`aula-ia-bernardocod.aws-us-east-1.turso.io`).
 | 0. Preparación | ✅ Plan en el repo, `docs/REQUISITOS.md`, `docs/DOCUMENTACION_TECNICA.md`, `CHANGELOG.md` |
 | 1. Independizar de Manus y participantes adultos | ✅ Sin Manus; ingreso solo con código de participante ("pe cero uno" → P01); a la IA solo llegan el código y el avance |
 | 5. Publicar (adelantada, en la nube) | ✅ Publicada en https://aula-ia-cientifica.onrender.com con Render + Turso |
-| 2. Uso sin manos | 🟡 Paso 1 hecho (lectura breve e interrupción por voz); falta el paso 2 |
+| 2. Uso sin manos | ✅ Lectura breve, interrupción por voz, bienvenida, ingreso guiado y "siguiente / anterior / activar" |
 | 3, 4, 6 | ⬜ Pendientes |
 
 Verificación al cierre: `pnpm check` sin errores y `pnpm test` con 42 de 42 pruebas aprobadas.
 
-## Fase 2, paso 2 (pendiente)
+## Fase 3 propuesta: acciones sobre la pantalla (esperando "ok")
 
-1. **Bienvenida hablada al abrir.** Jason saluda y explica qué decir. En dispositivos de otras personas
-   indica que toquen la pantalla una vez, porque el navegador no deja hablar a la app sin un primer toque.
-2. **Ingreso guiado por voz.** Jason pregunta "¿Cuál es tu código?", repite lo que entendió
-   ("Entendí P01, ¿es correcto?") y espera un sí o un no.
-3. **"Siguiente", "anterior" y "activar"** para recorrer los controles de cualquier pantalla.
+Criterio del plan: "se resuelve un cuestionario, se cambia de pestaña y se ajusta la configuración solo
+con la voz". Ya funcionan los cuestionarios, la velocidad de voz y el tamaño de letra. Falta:
+
+1. **Alto contraste por voz** ("activa el alto contraste"), recordado en el dispositivo (requisito RF-08).
+2. **Pestañas al instante** ("abre la pestaña retos") sin pasar por la IA.
+3. **Revisar las preguntas libres** sobre el contenido del curso y el bloqueo en modo evaluación.
 4. Pruebas, documentación, commit y push.
 
-El recorrido real por voz lo prueba Bernardo, en su PC o en el link publicado: la nube de Claude no tiene
-micrófono.
+Después: **Fase 4 (evidencias para el TIF)**, con el registro de comandos y tiempos, el cuestionario Likert
+por voz y la exportación a Excel. Es la más importante para el informe.
 
 ## Decisiones pendientes del grupo
 

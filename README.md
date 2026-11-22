@@ -86,6 +86,10 @@ actividades, retos, interacciones con el Tutor IA y consultas. Para verla con un
 
 **Cómo activarlo: solo con la voz**
 
+- Al abrir la app, **Jason da la bienvenida en voz alta** y queda escuchando. Si el navegador no deja
+  hablar a la página (pasa la primera vez en celulares y en computadoras de otras personas), aparece el
+  aviso **"Toca la pantalla para activar la voz"**: basta un toque en cualquier parte.
+
 - Di **"Oye Jason"** u **"Ok Jason"** en cualquier pantalla, como con el asistente de Google. Puedes
   decir la orden seguida: "Oye Jason, abre el módulo dos".
 - La activación por voz está encendida desde que se abre la página. Tras cada respuesta vuelve a
@@ -105,8 +109,11 @@ actividades, retos, interacciones con el Tutor IA y consultas. Para verla con un
 - Navegar: "abre el módulo tres", "llévame a mis resultados", "quiero hacer el pretest".
 - Leer: "qué hay en la pantalla", "lee todo", "lee la tabla de participantes", "repite".
 - Actuar sobre cualquier control: "pulsa continuar", "abre la pestaña retos", "marca la casilla".
-- Ingreso: "mi código es pe cero uno" (se guarda como P01). Cada participante crea su código; si ya
-  participó, usa el mismo para continuar. No se piden nombres ni datos personales.
+- Ingreso guiado: "quiero empezar" → Jason pregunta el código → "pe cero uno" → "Entendí P 0 1, ¿es
+  correcto?" → "sí". Cada participante crea su código; si ya participó, usa el mismo para continuar.
+  No se piden nombres ni datos personales.
+- Recorrer la pantalla: "siguiente" y "anterior" pasan por los botones, enlaces y campos diciendo su
+  nombre; "activar" pulsa el elegido (si envía o borra algo, pide confirmación).
 - Formularios: dicta lo que quieres escribir en cada campo. Pide confirmación antes de enviar,
   guardar evaluaciones, borrar o salir.
 - Órdenes de varios pasos: "entra a mi ruta y abre el tutor" (navega, mira la pantalla nueva y sigue).

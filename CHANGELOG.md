@@ -3,6 +3,18 @@
 Cambios del prototipo Aula IA Científica, de lo más reciente a lo más antiguo. El detalle técnico de cada
 fase está en [`docs/DOCUMENTACION_TECNICA.md`](docs/DOCUMENTACION_TECNICA.md).
 
+## Fase 2, paso 2 — Bienvenida, ingreso guiado y recorrido de controles (2026-11-22)
+
+### Agregado
+- Bienvenida hablada al abrir la app. Si el navegador bloquea la voz, aviso "Toca la pantalla para activar
+  la voz" (un toque en cualquier parte) u opción "Usar sin voz".
+- Ingreso guiado por voz: "¿Cuál es tu código?" → "pe cero uno" → "Entendí P 0 1, ¿es correcto?" → sí/no.
+- "Siguiente", "anterior" y "activar" para recorrer y pulsar los controles de cualquier pantalla.
+- Al llegar al ingreso, Jason pregunta el código; al llegar a una evaluación, lee la primera pregunta.
+
+### Cambiado
+- "Quiero empezar" sin haber ingresado lleva al ingreso.
+
 ## Fase 2, paso 1 — Lectura breve e interrupción por voz (2026-11-22)
 
 ### Agregado

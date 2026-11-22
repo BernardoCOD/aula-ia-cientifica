@@ -150,3 +150,17 @@ describe("lecturas rápidas en evaluaciones (sin IA)", () => {
     expect(interpretLocalCommand("cuántas me faltan", inQuestion)?.kind).toBe("evaluation_progress");
   });
 });
+
+describe("recorrer los controles con la voz (sin IA)", () => {
+  it("siguiente, anterior y activar fuera de una pregunta", () => {
+    expect(interpretLocalCommand("siguiente")?.kind).toBe("focus_next");
+    expect(interpretLocalCommand("siguiente botón")?.kind).toBe("focus_next");
+    expect(interpretLocalCommand("anterior")?.kind).toBe("focus_previous");
+    expect(interpretLocalCommand("actívalo")?.kind).toBe("activate_focused");
+    expect(interpretLocalCommand("pulsar")?.kind).toBe("activate_focused");
+  });
+
+  it("dentro de una pregunta, siguiente sigue cambiando de pregunta", () => {
+    expect(interpretLocalCommand("siguiente", { inQuestion: true })?.kind).toBe("next_question");
+  });
+});

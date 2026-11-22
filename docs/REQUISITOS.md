@@ -3,7 +3,7 @@
 **Proyecto:** Asistente de voz con inteligencia artificial para capacitación de personas con discapacidad
 visual y motriz, Lima, 2026 (TIF Nivel II, UCV).
 **Objetivo específico que atiende:** OE1. Identificar los requisitos funcionales y de accesibilidad.
-**Estado:** actualizado al cierre de la Fase 1. Se revisa al cerrar cada fase.
+**Estado:** actualizado al cierre de la Fase 2. Se revisa al cerrar cada fase.
 
 **Leyenda de estado** (verificado en el código de la rama `main`): ✅ cumplido · 🟡 parcial · ⬜ pendiente.
 
@@ -39,19 +39,19 @@ Compromiso" indica el principio; "ISO 9241-11" indica la dimensión de usabilida
 | Código | Requisito | WCAG 2.2 | DUA 3.0 | ISO 9241-11 | Fase | Estado |
 |---|---|---|---|---|---|---|
 | RF-01 | Activar el asistente diciendo una palabra de activación ("Oye Jason"), sin tecla ni clic | 2.1.1 (alternativa al teclado), 2.5.3 | Acción y expresión | Eficacia | 2 | ✅ |
-| RF-02 | Tras conceder el micrófono una sola vez, la app escucha sola al abrir y da una **bienvenida hablada** que explica qué se puede decir | 3.3.2, 1.4.2 | Representación, Compromiso | Eficacia, satisfacción | 2 | 🟡 escucha sola; falta la bienvenida hablada |
-| RF-03 | Ingresar con un **código de participante dicho por voz** (ej. "P cero uno"), sin contraseña | 3.3.8, 3.3.7 | Acción y expresión | Eficacia, eficiencia | 1, 2 | 🟡 Fase 1: solo código, creado por el participante y normalizado al dictarlo ("pe cero uno" → P01); falta el ingreso guiado por voz (Fase 2) |
+| RF-02 | Tras conceder el micrófono una sola vez, la app escucha sola al abrir y da una **bienvenida hablada** que explica qué se puede decir | 3.3.2, 1.4.2 | Representación, Compromiso | Eficacia, satisfacción | 2 | ✅ Fase 2: bienvenida hablada; si el navegador lo exige, aviso "Toca la pantalla para activar la voz" |
+| RF-03 | Ingresar con un **código de participante dicho por voz** (ej. "P cero uno"), sin contraseña | 3.3.8, 3.3.7 | Acción y expresión | Eficacia, eficiencia | 1, 2 | ✅ Fase 2: ingreso guiado por voz ("Entendí P 0 1, ¿es correcto?" → sí/no) |
 | RF-04 | Navegar por voz entre secciones, módulos y páginas ("abre el módulo dos", "volver al inicio") | 2.4.2, 2.4.5 | Acción y expresión | Eficacia | 2, 3 | ✅ |
 | RF-05 | Leer la pantalla: resumen breve por defecto, "lee todo", "repite", "dónde estoy" y "qué puedo hacer" | 1.1.1, 1.3.1, 2.4.6 | Representación | Eficacia | 3 | ✅ |
 | RF-06 | Actuar sobre los controles visibles: pulsar, escribir, marcar, abrir pestañas o secciones y desplazarse | 4.1.2, 2.5.3 | Acción y expresión | Eficacia, eficiencia | 3 | ✅ |
-| RF-07 | Navegación secuencial por voz: "siguiente", "anterior", "activar" | 2.4.3, 2.1.1 | Acción y expresión | Eficiencia | 3 | 🟡 solo entre preguntas; falta en toda la pantalla |
+| RF-07 | Navegación secuencial por voz: "siguiente", "anterior", "activar" | 2.4.3, 2.1.1 | Acción y expresión | Eficiencia | 3 | ✅ Fase 2: "siguiente / anterior / activar" en cualquier pantalla |
 | RF-08 | Ajustar por voz la velocidad de la voz, el tamaño de letra y el contraste | 1.4.4, 1.4.3 | Representación (personalizar la presentación) | Satisfacción | 3 | 🟡 velocidad y letra; falta contraste |
 | RF-09 | Responder preguntas libres sobre el contenido de la capacitación | 3.1.3 (AAA, buena práctica) | Representación (construcción del conocimiento) | Eficacia | 3 | ✅ |
 | RF-10 | Buscar en internet temas de la capacitación y leer la respuesta con sus fuentes (Área de consultas) | 1.1.1 | Representación | Eficacia | 3 | ✅ |
 | RF-11 | Resolver cuestionarios por voz: leer pregunta y alternativas, marcar la opción dictada y avanzar | 2.1.1, 4.1.2 | Acción y expresión | Eficacia | 3 | ✅ Fase 2: lectura breve tipo examen oral y órdenes instantáneas ("pregunta tres", "lee la opción B") |
 | RF-12 | Pedir confirmación "sí / no" antes de enviar, borrar o finalizar | 3.3.4 | Acción y expresión (estrategias) | Eficacia | 2 | ✅ |
 | RF-13 | En modo evaluación, no dar respuestas ni pistas (bloqueado en el servidor, no solo en la IA) | — | — | Validez de la evaluación | 3 | ✅ |
-| RF-14 | Anunciar por voz los cambios de pantalla, los resultados de cada acción y los errores | 4.1.3, 3.3.1 | Representación | Eficacia | 2, 3 | 🟡 anuncia resultados de acciones; revisar cambios de pantalla |
+| RF-14 | Anunciar por voz los cambios de pantalla, los resultados de cada acción y los errores | 4.1.3, 3.3.1 | Representación | Eficacia | 2, 3 | ✅ Fase 2: anuncia cada pantalla nueva; en el ingreso pregunta el código y en una evaluación lee la primera pregunta |
 | RF-15 | Comandos locales deterministas que funcionan sin IA ni red (respaldo si la IA falla) | — | Acción y expresión | Eficacia | 2 | ✅ |
 | RF-16 | Modo alternativo de teclado y texto siempre disponible | 2.1.1, 2.1.2 | Acción y expresión (múltiples medios) | Eficacia | todas | ✅ |
 | RF-17 | Registrar, **sin audio**, por participante y sesión: comando emitido, comando reconocido (local o IA), intención, tarea, si se completó, tiempo de respuesta (ms) y si necesitó ayuda | — | — | Eficacia, eficiencia (indicadores de la ficha de observación) | 4 | ⬜ |

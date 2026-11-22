@@ -27,6 +27,8 @@ export type AssistantHandlers = {
   /** Marca la alternativa en la pregunta indicada (por defecto, la pregunta activa). */
   onSelectOption?: (letter: OptionLetter, questionIndex?: number) => void;
   onStartActivity?: () => void;
+  /** Pantalla de ingreso: entra con el código que la persona dictó y confirmó. */
+  onParticipantCode?: (code: string) => void;
 };
 
 export type OptionLetter = "A" | "B" | "C" | "D";
@@ -52,6 +54,9 @@ export type LocalCommand =
   | { kind: "read_options" }
   | { kind: "read_option"; letter: OptionLetter }
   | { kind: "evaluation_progress" }
+  | { kind: "focus_next" }
+  | { kind: "focus_previous" }
+  | { kind: "activate_focused" }
   | { kind: "navigate"; path: string; label: string }
   | { kind: "back" };
 
@@ -190,6 +195,14 @@ export function interpretLocalCommand(
       return { kind: "read_question" };
   }
 
+  // Recorrer los controles de la pantalla, como con la tecla Tab (en una pregunta, "siguiente" cambia
+  // de pregunta y se resolvió arriba).
+  if (/^(?:siguiente|el siguiente|siguiente (?:boton|control|elemento|opcion|enlace)|(?:boton|control|elemento) siguiente|avanza|adelante)$/.test(value))
+    return { kind: "focus_next" };
+  if (/^(?:anterior|el anterior|anterior (?:boton|control|elemento|opcion|enlace)|(?:boton|control|elemento) anterior|retrocede)$/.test(value))
+    return { kind: "focus_previous" };
+  if (/^(?:activar|activa|activalo|activala|pulsar|pulsa|pulsalo|presionar|presiona|presionalo|selecciona(?:lo)?|abrelo|aceptar|entrar|entra)$/.test(value))
+    return { kind: "activate_focused" };
   if (/^(?:volver|regresar|atras|ve atras|vuelve atras|regresa)$/.test(value))
     return { kind: "back" };
   // "Quiero empezar", "comenzar la capacitación": lleva a la ruta de aprendizaje.

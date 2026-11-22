@@ -30,10 +30,19 @@ export default function Identification() {
     {
       onContinue: () =>
         document.querySelector<HTMLInputElement>("input")?.focus(),
+      // Código dictado y confirmado por voz ("Entendí P 0 1, ¿es correcto?" → "sí").
+      onParticipantCode: spoken => {
+        setCode(spoken);
+        void enter(spoken);
+      },
     }
   );
-  const submit = async (event: FormEvent) => {
+  const submit = (event: FormEvent) => {
     event.preventDefault();
+    void enter(normalized);
+  };
+  /** Registra el código (o reconoce a quien vuelve) y abre el diagnóstico o la ruta. */
+  const enter = async (normalized: string) => {
     if (!normalized) {
       toast.error(
         "Escribe o di un código de 2 a 32 letras o números, por ejemplo P01."

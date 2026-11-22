@@ -206,6 +206,26 @@ menos dos palabras, para no cortar por un ruido.
 opción B", "lee las opciones", "solo la pregunta" y "cuántas me faltan" se resuelven en el navegador, al
 instante y sin IA. Al marcar una alternativa dice "Marcada la C." y lee la siguiente pregunta.
 
+### 5.2.3 Uso sin manos — `client/src/lib/handsFree.ts` y `client/src/components/VoiceAssistant.tsx`
+
+**Qué hace:**
+
+- **Bienvenida hablada:** al abrir la app (una vez por sesión), Jason saluda, explica cómo hablarle y queda
+  escuchando.
+- **Primer toque:** los navegadores no dejan que una página hable antes de que la persona la toque (política
+  de reproducción automática). Cuando la voz es bloqueada (`error: "not-allowed"`), aparece un aviso que
+  ocupa toda la pantalla: con un solo toque en cualquier parte se activa la voz. En la PC del autor,
+  `Iniciar Aula IA.bat` abre Chrome con un permiso que evita este paso.
+- **Ingreso guiado:** en la pantalla de ingreso, una frase con números ("pe cero uno") se interpreta como
+  el código y se **confirma antes de entrar**: "Entendí P 0 1, ¿es correcto?". Con "no", lo vuelve a
+  pedir. Se exige al menos un número para no confundir una frase cualquiera con un código.
+- **Recorrido de controles:** "siguiente" y "anterior" pasan por los botones, enlaces y campos visibles,
+  en el orden de la pantalla, como la tecla Tab. Jason dice el tipo y el nombre de cada uno ("Botón
+  Ingresar", "Casilla Acepto, marcada"). "Activar" pulsa el elegido y pide confirmación si envía, borra
+  o finaliza algo.
+- **Anuncio de pantallas:** al llegar al ingreso pregunta el código; al llegar a una evaluación lee la
+  primera pregunta.
+
 ### 5.3 Palabra de activación — `client/src/lib/voiceIntents.ts`
 
 ```ts
@@ -428,7 +448,7 @@ No se piden nombres ni datos personales.
 
 ## 9. Pruebas automáticas
 
-Se ejecutan con `pnpm test`. Estado actual: **13 archivos, 52 pruebas, todas aprobadas**.
+Se ejecutan con `pnpm test`. Estado actual: **14 archivos, 58 pruebas, todas aprobadas**.
 
 | Archivo | Qué verifica |
 |---|---|
@@ -441,6 +461,7 @@ Se ejecutan con `pnpm test`. Estado actual: **13 archivos, 52 pruebas, todas apr
 | `server/participant.code.test.ts` | Conversión del código dictado ("pe cero uno" → P01) |
 | `server/question.speech.test.ts` | Lectura breve de preguntas, opciones y avance |
 | `server/barge.in.test.ts` | Interrupción por voz: filtro de eco y palabras que detienen la lectura |
+| `server/hands.free.test.ts` | Bienvenida, código dictado en el ingreso y nombres de los controles |
 | `server/no.manus.test.ts` | Independencia de Manus: no quedan referencias en el código |
 | `server/database.config.test.ts` | Base de datos local (SQLite) o en la nube (Turso) según `DATABASE_URL` |
 | `server/admin.credentials.test.ts`, `server/admin.students.test.ts` | Acceso al panel docente (incluido el aviso si no está configurado) y gestión de participantes |
@@ -582,3 +603,28 @@ con ngrok) por la publicación en la nube.
   sin IA.
 - **Pendiente:** la interrupción hablando necesita micrófono real y la prueba el autor en su
   computadora.
+
+### Fase 2 (paso 2) — Bienvenida, ingreso guiado y recorrido de controles
+
+**Cambios:**
+
+- **Bienvenida hablada al abrir.** Si el navegador bloquea la voz, aparece el aviso "Toca la pantalla para
+  activar la voz", con la opción "Usar sin voz".
+- **Ingreso guiado por voz:** el código dictado se confirma con sí o no.
+- **"Quiero empezar"** sin haber ingresado lleva al ingreso y pregunta el código.
+- **"Siguiente", "anterior" y "activar"** recorren y pulsan los controles de cualquier pantalla. Los
+  controles riesgosos piden confirmación.
+- **Pantallas nuevas:** en el ingreso pregunta el código y en una evaluación lee la primera pregunta. En
+  ambos casos queda escuchando la respuesta, sin pedir "Oye Jason".
+
+**Verificación:**
+
+- `pnpm check` sin errores.
+- `pnpm test`: 58 de 58 pruebas aprobadas.
+- **Prueba en navegador (Chromium), con órdenes escritas en el cuadro de Jason:**
+  - aparece el aviso del primer toque y se oculta al tocar;
+  - "siguiente" y "anterior" nombran los controles;
+  - "quiero empezar" abre el ingreso;
+  - "pe cero siete" → "no" → "pe cero ocho" → "sí" entra con P08 y abre el diagnóstico;
+  - no hay errores en la consola.
+- **Pendiente:** el recorrido completo con micrófono lo prueba el autor.
