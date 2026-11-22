@@ -9,8 +9,12 @@
 (panel docente: `/docente`). Los Logs del 21 de noviembre confirman Gemini, el panel docente y la base de
 datos en la nube (`aula-ia-bernardocod.aws-us-east-1.turso.io`).
 
-**Siguiente paso:** compartir el link con el docente y empezar la **Fase 2 (uso sin manos)**, que espera el
-"ok" de Bernardo (plan abajo).
+**En curso: Fase 2 (uso sin manos).**
+
+- ✅ **Paso 1 (22 de noviembre):** lectura breve de evaluaciones, órdenes instantáneas e interrupción
+  hablando. **Bernardo debe probarlo** en el link con micrófono real y contar cómo le fue.
+- ⬜ **Paso 2:** bienvenida hablada al abrir, ingreso del código guiado por voz ("Entendí P01, ¿es
+  correcto?") y "siguiente / anterior / activar" para recorrer los botones.
 
 ## Lo que ya está hecho
 
@@ -19,20 +23,19 @@ datos en la nube (`aula-ia-bernardocod.aws-us-east-1.turso.io`).
 | 0. Preparación | ✅ Plan en el repo, `docs/REQUISITOS.md`, `docs/DOCUMENTACION_TECNICA.md`, `CHANGELOG.md` |
 | 1. Independizar de Manus y participantes adultos | ✅ Sin Manus; ingreso solo con código de participante ("pe cero uno" → P01); a la IA solo llegan el código y el avance |
 | 5. Publicar (adelantada, en la nube) | ✅ Publicada en https://aula-ia-cientifica.onrender.com con Render + Turso |
-| 2. Uso sin manos | ⬜ Plan propuesto, esperando el "ok" de Bernardo (ver abajo) |
+| 2. Uso sin manos | 🟡 Paso 1 hecho (lectura breve e interrupción por voz); falta el paso 2 |
 | 3, 4, 6 | ⬜ Pendientes |
 
 Verificación al cierre: `pnpm check` sin errores y `pnpm test` con 42 de 42 pruebas aprobadas.
 
-## Siguiente fase propuesta: Fase 2, uso sin manos (esperando "ok")
+## Fase 2, paso 2 (pendiente)
 
 1. **Bienvenida hablada al abrir.** Jason saluda y explica qué decir. En dispositivos de otras personas
    indica que toquen la pantalla una vez, porque el navegador no deja hablar a la app sin un primer toque.
 2. **Ingreso guiado por voz.** Jason pregunta "¿Cuál es tu código?", repite lo que entendió
    ("Entendí P01, ¿es correcto?") y espera un sí o un no.
 3. **"Siguiente", "anterior" y "activar"** para recorrer los controles de cualquier pantalla.
-4. **Tiempos de escucha más generosos.**
-5. Pruebas, documentación, commit y push.
+4. Pruebas, documentación, commit y push.
 
 El recorrido real por voz lo prueba Bernardo, en su PC o en el link publicado: la nube de Claude no tiene
 micrófono.

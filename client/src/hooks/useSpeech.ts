@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { shouldInterrupt } from "@/lib/bargeIn";
 
 // Reconocimiento (voz a texto) y síntesis (texto a voz) con la Web Speech API del navegador.
-// Funciona en "semi dúplex": nunca escucha mientras habla, para que el asistente no se oiga a
-// sí mismo y ejecute sus propias frases como órdenes.
+// Mientras el asistente habla, el micrófono sigue abierto para que la persona pueda interrumpirlo
+// hablando ("barge-in"). Lo que se oye se compara con lo que se está leyendo, para no confundir la
+// propia voz del asistente (captada por los parlantes) con una orden.
 
 type RecognitionAlternative = { transcript: string; confidence: number };
 type RecognitionResult = ArrayLike<RecognitionAlternative> & { isFinal: boolean };
@@ -47,6 +49,12 @@ export const recognitionSupported = () =>
   Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
 export const synthesisSupported = () =>
   typeof window !== "undefined" && "speechSynthesis" in window;
+/**
+ * Interrumpir hablando. En Android, abrir el micrófono corta el audio de la lectura, así que allí
+ * se interrumpe tocando la pantalla o el botón del asistente.
+ */
+export const bargeInSupported = () =>
+  recognitionSupported() && !/android/i.test(navigator.userAgent);
 
 /** Tono corto que indica por sonido que el micrófono se abrió o se cerró. */
 function playTone(kind: "on" | "off") {
@@ -158,9 +166,80 @@ export function useSpeech() {
     setStatus(current => (current === "speaking" ? "idle" : current));
   }, []);
 
-  /** Lee el texto en voz alta y llama a onDone al terminar (o al ser interrumpido). */
+  /**
+   * Escucha mientras el asistente habla. Si la persona dice algo que no es el eco de la lectura, la
+   * voz se calla al instante y onBargeIn recibe la frase completa ("" si no se entendió).
+   */
+  const listenWhileSpeaking = useCallback(
+    (token: number, spoken: string, onBargeIn: (heard: string) => void) => {
+      const RecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!RecognitionClass) return;
+      const recognition = new RecognitionClass();
+      recognition.lang = RECOGNITION_LANG;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+      recognitionRef.current = recognition;
+      let interrupted = false;
+      const finish = (heard: string) => {
+        recognitionRef.current = null;
+        recognition.onresult = null;
+        recognition.onend = null;
+        recognition.onerror = null;
+        recognition.abort();
+        setStatus("idle");
+        onBargeIn(heard);
+      };
+      recognition.onresult = event => {
+        let finalText = "";
+        let interim = "";
+        for (let index = event.resultIndex; index < event.results.length; index++) {
+          const result = event.results[index];
+          const text = result[0]?.transcript ?? "";
+          if (result.isFinal) finalText += text;
+          else interim += text;
+        }
+        const heard = (finalText || interim).trim();
+        if (!heard) return;
+        if (!interrupted) {
+          if (!shouldInterrupt(heard, spoken, Boolean(finalText.trim()))) return;
+          // La persona está hablando: el asistente se calla y la escucha hasta el final de la frase.
+          interrupted = true;
+          speakTokenRef.current++;
+          window.speechSynthesis.cancel();
+          setStatus("listening");
+        }
+        setTranscript(heard);
+        if (finalText.trim()) finish(finalText.trim());
+      };
+      recognition.onerror = () => undefined;
+      recognition.onend = () => {
+        if (recognitionRef.current !== recognition) return;
+        if (interrupted) return finish("");
+        // Chrome cierra la escucha cada cierto tiempo: se reabre mientras siga la lectura.
+        if (token === speakTokenRef.current) {
+          try {
+            recognition.start();
+          } catch {
+            recognitionRef.current = null;
+          }
+        }
+      };
+      try {
+        recognition.start();
+      } catch {
+        recognitionRef.current = null;
+      }
+    },
+    []
+  );
+
+  /**
+   * Lee el texto en voz alta y llama a onDone al terminar. Con onBargeIn, la persona puede
+   * interrumpir hablando: entonces se llama onBargeIn (con lo que dijo) en lugar de onDone.
+   */
   const speak = useCallback(
-    (text: string, onDone?: () => void) => {
+    (text: string, onDone?: () => void, onBargeIn?: (heard: string) => void) => {
       stopListening();
       const token = ++speakTokenRef.current;
       if (!synthesisSupported() || !text.trim()) {
@@ -170,9 +249,11 @@ export function useSpeech() {
       window.speechSynthesis.cancel();
       const chunks = splitIntoChunks(text);
       setStatus("speaking");
+      if (onBargeIn && bargeInSupported()) listenWhileSpeaking(token, text, onBargeIn);
       const next = (index: number) => {
         if (token !== speakTokenRef.current) return;
         if (index >= chunks.length) {
+          stopListening();
           setStatus("idle");
           onDone?.();
           return;
@@ -187,7 +268,7 @@ export function useSpeech() {
       };
       next(0);
     },
-    [stopListening]
+    [stopListening, listenWhileSpeaking]
   );
 
   const listen = useCallback(

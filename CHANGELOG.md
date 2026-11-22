@@ -3,6 +3,21 @@
 Cambios del prototipo Aula IA Científica, de lo más reciente a lo más antiguo. El detalle técnico de cada
 fase está en [`docs/DOCUMENTACION_TECNICA.md`](docs/DOCUMENTACION_TECNICA.md).
 
+## Fase 2, paso 1 — Lectura breve e interrupción por voz (2026-11-22)
+
+### Agregado
+- **Interrumpir hablando:** si la persona habla mientras Jason lee, Jason se calla y la atiende. Un
+  filtro de eco evita que confunda su propia voz con una orden. En Android se interrumpe tocando.
+- Órdenes instantáneas en evaluaciones: "pregunta tres", "lee la opción B", "lee las opciones", "solo la
+  pregunta", "cuántas me faltan".
+- Al abrir el pretest o el postest por voz se lee la primera pregunta.
+
+### Cambiado
+- Lectura de preguntas tipo examen oral: "Pregunta 3 de 10. Texto. A: … B: …", sin relleno. Al marcar:
+  "Marcada la C." y lee la siguiente.
+- Respuestas de la IA más breves (como máximo 2 oraciones).
+- La escucha espera tres silencios antes de quedar en espera.
+
 ## Publicación en la nube — Fase 5 adelantada (2026-10-27)
 
 ### Agregado

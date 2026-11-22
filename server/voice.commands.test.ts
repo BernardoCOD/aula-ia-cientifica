@@ -127,3 +127,26 @@ describe("local voice commands (sin IA)", () => {
     expect(WAKE_PATTERN.test(normalizeSpeech("hoy es jueves"))).toBe(false);
   });
 });
+
+describe("lecturas rápidas en evaluaciones (sin IA)", () => {
+  const inQuestion = { inQuestion: true };
+  it("va a una pregunta diciendo solo su número o pidiendo leerla", () => {
+    expect(interpretLocalCommand("pregunta tres", inQuestion)).toEqual({ kind: "go_to_question", index: 2 });
+    expect(interpretLocalCommand("lee la pregunta cinco", inQuestion)).toEqual({ kind: "go_to_question", index: 4 });
+    expect(interpretLocalCommand("¿qué dice la pregunta 2?", inQuestion)).toEqual({ kind: "go_to_question", index: 1 });
+  });
+
+  it("lee una opción sin marcarla", () => {
+    expect(interpretLocalCommand("lee la opción b", inQuestion)).toEqual({ kind: "read_option", letter: "B" });
+    expect(interpretLocalCommand("¿cuál es la c?", inQuestion)).toEqual({ kind: "read_option", letter: "C" });
+    // Decir la letra sigue marcándola.
+    expect(interpretLocalCommand("opción b", inQuestion)).toEqual({ kind: "select_option", letter: "B" });
+  });
+
+  it("lee solo las opciones, solo la pregunta o el avance", () => {
+    expect(interpretLocalCommand("lee las opciones", inQuestion)?.kind).toBe("read_options");
+    expect(interpretLocalCommand("alternativas", inQuestion)?.kind).toBe("read_options");
+    expect(interpretLocalCommand("solo la pregunta", inQuestion)?.kind).toBe("read_question_text");
+    expect(interpretLocalCommand("cuántas me faltan", inQuestion)?.kind).toBe("evaluation_progress");
+  });
+});

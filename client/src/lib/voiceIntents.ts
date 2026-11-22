@@ -48,6 +48,10 @@ export type LocalCommand =
   | { kind: "previous_question" }
   | { kind: "go_to_question"; index: number }
   | { kind: "read_question" }
+  | { kind: "read_question_text" }
+  | { kind: "read_options" }
+  | { kind: "read_option"; letter: OptionLetter }
+  | { kind: "evaluation_progress" }
   | { kind: "navigate"; path: string; label: string }
   | { kind: "back" };
 
@@ -151,6 +155,17 @@ export function interpretLocalCommand(
   if (/\bmodo simulacion\b/.test(value)) return { kind: "simulation" };
 
   if (options.inQuestion) {
+    // Lecturas rápidas (van antes que "marcar": "lee la opción b" no debe marcar la B).
+    const readOption = value.match(
+      /^(?:lee|leer|leeme|repite|repetir|cual es|que dice|dime)(?: la)? (?:opcion|alternativa|letra)? ?([abcd])$/
+    );
+    if (readOption) return { kind: "read_option", letter: readOption[1].toUpperCase() as OptionLetter };
+    if (/^(?:(?:lee|leer|leeme|repite|repetir|dime|cuales son)(?: las)? )?(?:opciones|alternativas)$/.test(value))
+      return { kind: "read_options" };
+    if (/^(?:lee |leer |leeme |repite )?solo la pregunta$/.test(value))
+      return { kind: "read_question_text" };
+    if (/^(?:cuanto|cuantas|cuantos|que) (?:me falta|me faltan|preguntas me faltan|respondi|llevo|avance)|^(?:mi )?(?:progreso|avance)$/.test(value))
+      return { kind: "evaluation_progress" };
     if (/^(?:guarda|guardar|envia|enviar|entrega|entregar|termina|terminar|finaliza|finalizar)(?: (?:mis |las |el |la )?(?:respuestas|pretest|postest|evaluacion|examen|prueba|test))?$/.test(value))
       return { kind: "submit_evaluation" };
     // "En la pregunta 3 marca la B", "la respuesta de la pregunta dos es la c".
@@ -166,7 +181,9 @@ export function interpretLocalCommand(
       return { kind: "next_question" };
     if (/^(?:pregunta anterior|anterior pregunta|anterior|regresa a la pregunta anterior)$/.test(value))
       return { kind: "previous_question" };
-    const question = value.match(new RegExp(`(?:ir a|ve a|pasa a|abre|responder|contestar)(?: la)? pregunta ${NUMBER}\\b`));
+    const question =
+      value.match(new RegExp(`(?:ir a|ve a|pasa a|abre|responder|contestar|lee|leer|leeme|repite|que dice)(?: la)? pregunta ${NUMBER}\\b`)) ??
+      value.match(new RegExp(`^(?:la )?pregunta (?:numero )?${NUMBER}$`));
     if (question && toNumber(question[1]) > 0)
       return { kind: "go_to_question", index: toNumber(question[1]) - 1 };
     if (/^(?:lee|leer|leeme|repite|repetir)(?: otra vez)? la pregunta$|^(?:cual es )?la pregunta$/.test(value))

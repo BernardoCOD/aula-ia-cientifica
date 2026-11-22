@@ -161,19 +161,50 @@ recognition.onresult = event => {
 **Qué hace:** usa el reconocedor de voz del navegador para convertir la voz en texto en español de Perú.
 No graba ni guarda audio: el navegador entrega solo el texto.
 
-### 5.2 Síntesis de voz (TTS) y semidúplex — `client/src/hooks/useSpeech.ts`
+### 5.2 Síntesis de voz (TTS) e interrupción por voz — `client/src/hooks/useSpeech.ts`
 
 ```ts
-const speak = (text, onDone) => {
-  stopListening();                      // semidúplex: nunca escucha mientras habla
-  const chunks = splitIntoChunks(text); // lecturas largas divididas en frases
+const speak = (text, onDone, onBargeIn) => {
+  const chunks = splitIntoChunks(text);   // lecturas largas divididas en frases
+  if (onBargeIn && bargeInSupported())
+    listenWhileSpeaking(token, text, onBargeIn); // el micrófono sigue abierto mientras habla
   // ... cada frase se lee con SpeechSynthesisUtterance, con una voz en español
   //     latinoamericano y la velocidad elegida por la persona
 };
 ```
 
-**Qué hace:** lee las respuestas en voz alta. Divide los textos largos en frases para poder detenerlos con
-"para". Elige primero una voz `es-PE` o latinoamericana.
+**Qué hace:**
+
+- Lee las respuestas en voz alta. Divide los textos largos en frases y elige primero una voz `es-PE` o
+  latinoamericana.
+- **Interrupción por voz** (en inglés, *barge-in*). Desde la Fase 2, mientras el asistente habla, el
+  reconocimiento de voz sigue escuchando. Si la persona dice algo, la voz se calla al instante y lo dicho
+  se atiende como una orden nueva. Así funcionan los asistentes de voz comerciales: el turno de palabra lo
+  toma quien habla.
+- En Android esta función queda desactivada, porque abrir el micrófono corta el audio de la lectura.
+  Allí se interrumpe tocando la pantalla.
+
+### 5.2.1 Filtro de eco — `client/src/lib/bargeIn.ts`
+
+```ts
+export function isLikelyEcho(heard: string, spoken: string) {
+  if (spokenText.includes(heardText)) return true;          // repite una parte de lo que se lee
+  const found = meaningful.filter(word => spokenWords.has(word)).length;
+  return found / meaningful.length >= 0.6;                  // 60 % de sus palabras se están leyendo
+}
+```
+
+**Qué hace:** con parlantes, el micrófono también capta la voz del asistente. Para no confundirla con una
+orden, lo que se oye se compara con el texto que se está leyendo: si coincide, es eco y se ignora. Las
+palabras "para", "basta" o "Jason" siempre detienen la lectura. En resultados parciales se esperan al
+menos dos palabras, para no cortar por un ruido.
+
+### 5.2.2 Lectura breve de evaluaciones — `client/src/lib/questionSpeech.ts`
+
+**Qué hace:** lee como un examen oral, sin frases de relleno:
+"Pregunta 3 de 10. *Texto de la pregunta*. A: … B: … C: … D: …". Las órdenes "pregunta tres", "lee la
+opción B", "lee las opciones", "solo la pregunta" y "cuántas me faltan" se resuelven en el navegador, al
+instante y sin IA. Al marcar una alternativa dice "Marcada la C." y lee la siguiente pregunta.
 
 ### 5.3 Palabra de activación — `client/src/lib/voiceIntents.ts`
 
@@ -345,7 +376,7 @@ No se piden nombres ni datos personales.
 | Procesamiento del lenguaje natural (PLN) y modelos de lenguaje (LLM) | Modelos que interpretan y generan lenguaje humano | Gemini interpreta la intención de cada orden (5.6) |
 | Salidas estructuradas / uso de herramientas por agentes | El modelo responde con un formato fijo (JSON) y elige acciones de una lista | Esquema de respuesta del agente (5.6) |
 | Generación aumentada con recuperación (RAG) | El modelo responde apoyándose en documentos recuperados | Área de consultas con Wikipedia (5.9) |
-| Interfaz de usuario por voz (VUI) y diseño conversacional | Diseño de la interacción hablada: turnos, confirmaciones, palabra de activación, manejo de errores | Activación "Oye Jason", confirmación sí/no, semidúplex, mensajes breves |
+| Interfaz de usuario por voz (VUI) y diseño conversacional | Diseño de la interacción hablada: turnos, confirmaciones, palabra de activación, manejo de errores | Activación "Oye Jason", confirmación sí/no, interrupción por voz (*barge-in*) con filtro de eco, mensajes breves |
 | Accesibilidad web (WCAG 2.2, ARIA) | Pautas para que el contenido sea perceptible, operable, comprensible y robusto | Nombres accesibles y roles ARIA usados por la fotografía de pantalla (5.5); requisitos en `docs/REQUISITOS.md` |
 | Diseño Universal para el Aprendizaje (DUA 3.0) | Múltiples formas de representación, acción y expresión, y compromiso | Contenido leído en voz, por texto o en pantalla; respuesta por voz, teclado o ratón |
 | Usabilidad (ISO 9241-11) | Eficacia, eficiencia y satisfacción en un contexto de uso | Indicadores del registro de evidencias (Fase 4) y cuestionario Likert |
@@ -397,7 +428,7 @@ No se piden nombres ni datos personales.
 
 ## 9. Pruebas automáticas
 
-Se ejecutan con `pnpm test`. Estado actual: **11 archivos, 42 pruebas, todas aprobadas**.
+Se ejecutan con `pnpm test`. Estado actual: **13 archivos, 52 pruebas, todas aprobadas**.
 
 | Archivo | Qué verifica |
 |---|---|
@@ -408,6 +439,8 @@ Se ejecutan con `pnpm test`. Estado actual: **11 archivos, 42 pruebas, todas apr
 | `server/version2.validation.test.ts` | Formato de los datos de evaluación |
 | `server/student.validation.test.ts` | Ingreso del participante: código dictado, participante que vuelve, códigos inválidos |
 | `server/participant.code.test.ts` | Conversión del código dictado ("pe cero uno" → P01) |
+| `server/question.speech.test.ts` | Lectura breve de preguntas, opciones y avance |
+| `server/barge.in.test.ts` | Interrupción por voz: filtro de eco y palabras que detienen la lectura |
 | `server/no.manus.test.ts` | Independencia de Manus: no quedan referencias en el código |
 | `server/database.config.test.ts` | Base de datos local (SQLite) o en la nube (Turso) según `DATABASE_URL` |
 | `server/admin.credentials.test.ts`, `server/admin.students.test.ts` | Acceso al panel docente (incluido el aviso si no está configurado) y gestión de participantes |
@@ -521,3 +554,31 @@ con ngrok) por la publicación en la nube.
 - `pnpm test`: 42 de 42 pruebas aprobadas. Incluye la configuración de la base de datos local y en la nube.
 - **Pendiente:** la primera publicación real en Render y Turso la hace el autor con sus cuentas, porque
   requiere iniciar sesión.
+
+### Fase 2 (paso 1) — Lectura breve e interrupción por voz
+
+**Problema observado por el autor al probar la app publicada:**
+
+- En las evaluaciones, el asistente hablaba demasiado y algunas órdenes ("pregunta uno") tardaban, porque
+  iban a la IA.
+- No se le podía interrumpir: el micrófono se apagaba mientras hablaba.
+
+**Cambios:**
+
+- **Lectura tipo examen oral** (`questionSpeech.ts`): pregunta y alternativas con su letra, sin relleno.
+  "¿Qué hay en la pantalla?" durante una evaluación lee solo el título y la pregunta activa.
+- **Órdenes instantáneas sin IA:** "pregunta tres", "lee la pregunta tres", "lee la opción B", "lee las
+  opciones", "solo la pregunta" y "cuántas me faltan".
+- **Al abrir el pretest o el postest por voz,** se lee directamente la primera pregunta.
+- **Interrupción por voz con filtro de eco** (`useSpeech.ts`, `bargeIn.ts`).
+- **Respuestas de la IA más breves:** como máximo 2 oraciones, con un formato fijo para leer preguntas.
+- **La escucha espera tres silencios** antes de quedar en espera (antes eran dos).
+
+**Verificación:**
+
+- `pnpm check` sin errores.
+- `pnpm test`: 52 de 52 pruebas aprobadas.
+- **Prueba en navegador (Chromium) con órdenes escritas en el pretest:** todas se responden al instante,
+  sin IA.
+- **Pendiente:** la interrupción hablando necesita micrófono real y la prueba el autor en su
+  computadora.

@@ -48,7 +48,7 @@ Compromiso" indica el principio; "ISO 9241-11" indica la dimensión de usabilida
 | RF-08 | Ajustar por voz la velocidad de la voz, el tamaño de letra y el contraste | 1.4.4, 1.4.3 | Representación (personalizar la presentación) | Satisfacción | 3 | 🟡 velocidad y letra; falta contraste |
 | RF-09 | Responder preguntas libres sobre el contenido de la capacitación | 3.1.3 (AAA, buena práctica) | Representación (construcción del conocimiento) | Eficacia | 3 | ✅ |
 | RF-10 | Buscar en internet temas de la capacitación y leer la respuesta con sus fuentes (Área de consultas) | 1.1.1 | Representación | Eficacia | 3 | ✅ |
-| RF-11 | Resolver cuestionarios por voz: leer pregunta y alternativas, marcar la opción dictada y avanzar | 2.1.1, 4.1.2 | Acción y expresión | Eficacia | 3 | ✅ |
+| RF-11 | Resolver cuestionarios por voz: leer pregunta y alternativas, marcar la opción dictada y avanzar | 2.1.1, 4.1.2 | Acción y expresión | Eficacia | 3 | ✅ Fase 2: lectura breve tipo examen oral y órdenes instantáneas ("pregunta tres", "lee la opción B") |
 | RF-12 | Pedir confirmación "sí / no" antes de enviar, borrar o finalizar | 3.3.4 | Acción y expresión (estrategias) | Eficacia | 2 | ✅ |
 | RF-13 | En modo evaluación, no dar respuestas ni pistas (bloqueado en el servidor, no solo en la IA) | — | — | Validez de la evaluación | 3 | ✅ |
 | RF-14 | Anunciar por voz los cambios de pantalla, los resultados de cada acción y los errores | 4.1.3, 3.3.1 | Representación | Eficacia | 2, 3 | 🟡 anuncia resultados de acciones; revisar cambios de pantalla |
@@ -63,9 +63,9 @@ Compromiso" indica el principio; "ISO 9241-11" indica la dimensión de usabilida
 | Código | Requisito | Referencia | Fase | Estado |
 |---|---|---|---|---|
 | RNF-01 | Español de Perú (es-PE), lenguaje simple y mensajes breves | WCAG 3.1.1, 3.1.5 (AAA, como buena práctica); DUA Representación (lenguaje) | todas | ✅ textos para personas adultas (Fase 1) |
-| RNF-02 | Ninguna acción tiene tiempo límite ni exige precisión; tiempos de espera de escucha generosos | WCAG 2.2.1; ISO/IEC 25010 capacidad de interacción (inclusividad) | 2 | 🟡 revisar en Fase 2 |
+| RNF-02 | Ninguna acción tiene tiempo límite ni exige precisión; tiempos de espera de escucha generosos | WCAG 2.2.1; ISO/IEC 25010 capacidad de interacción (inclusividad) | 2 | 🟡 Fase 2: espera tres silencios antes de quedar en espera; Chrome corta cada escucha tras unos segundos de silencio |
 | RNF-03 | Comandos cortos y tolerantes a variaciones (sinónimos, errores de reconocimiento, números dichos con palabras) | DUA Acción y expresión; ISO/IEC 25010 protección frente a errores del usuario | 2, 3 | ✅ |
-| RNF-04 | Semidúplex: el asistente no escucha mientras habla, y la voz se puede detener con un comando ("para") | WCAG 1.4.2 | 2 | ✅ |
+| RNF-04 | El asistente se puede interrumpir hablando: se calla y atiende la nueva orden, sin confundir su propia voz con una orden ("para" siempre lo detiene) | WCAG 1.4.2 | 2 | ✅ Fase 2 (en computadoras; en Android se interrumpe tocando) |
 | RNF-05 | **Privacidad:** no se graba audio; los campos de contraseña nunca se leen, se escriben ni se envían a la IA; no se envían nombres ni datos personales a la IA | Ley N.º 29733 (Perú); ISO/IEC 25010 seguridad (confidencialidad) | todas | ✅ desde la Fase 1, a la IA solo llegan el código y el avance |
 | RNF-06 | **Seguridad del agente:** la IA solo devuelve acciones de una lista cerrada que el servidor valida; nunca se ejecuta código arbitrario; las claves de la IA solo existen en el servidor | ISO/IEC 25010 seguridad (integridad) | 1, 3 | ✅ |
 | RNF-07 | Compatibilidad: Chrome y Edge de escritorio, y Chrome en Android | WCAG 4.1.2; ISO/IEC 25010 compatibilidad | 5 | 🟡 probado en Chrome/Edge de escritorio |

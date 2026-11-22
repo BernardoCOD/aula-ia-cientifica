@@ -25,6 +25,7 @@ import { trpc } from "@/lib/trpc";
 import { useAssistantContext } from "@/contexts/AssistantContext";
 import { useSpeech } from "@/hooks/useSpeech";
 import { getStudent } from "@/lib/student";
+import { spokenOption, spokenOptions, spokenProgress, spokenQuestion } from "@/lib/questionSpeech";
 import {
   AI_UNAVAILABLE_MESSAGE,
   ASSISTANT_NAME,
@@ -184,8 +185,8 @@ export function VoiceAssistant() {
           return;
         }
         silenceCountRef.current++;
-        if (silenceCountRef.current >= 2) {
-          // Dos silencios seguidos: queda en espera para no tener el micrófono abierto sin motivo.
+        if (silenceCountRef.current >= 3) {
+          // Tres silencios seguidos: queda en espera para no tener el micrófono abierto sin motivo.
           silenceCountRef.current = 0;
           const next = alwaysListenRef.current ? "wake" : "off";
           setMode(next);
@@ -218,9 +219,19 @@ export function VoiceAssistant() {
         if (!text) return resolve();
         lastSpokenRef.current = text;
         setLastResponse(text);
-        speech.speak(text, resolve);
+        // En conversación, la persona puede interrumpir hablando: lo que dijo se atiende como una
+        // orden nueva y la lectura anterior se abandona (la promesa no se resuelve).
+        const onBargeIn =
+          modeRef.current === "conversation"
+            ? (heard: string) => {
+                silenceCountRef.current = 0;
+                if (heard) handleRef.current(heard);
+                else resumeListening();
+              }
+            : undefined;
+        speech.speak(text, resolve, onBargeIn);
       }),
-    [speech]
+    [speech, resumeListening]
   );
 
   /** Responde en voz alta, lo registra en el historial y luego vuelve a escuchar. */
@@ -281,12 +292,19 @@ export function VoiceAssistant() {
     []
   );
 
-  const readQuestion = useCallback(() => {
+  /** Lectura corta de la pregunta activa: "Pregunta 3 de 10. ¿…? A: …. B: …." */
+  const readQuestion = useCallback((withOptions = true) => {
     const screen = screenRef.current;
     if (!screen.currentQuestion) return "No hay una pregunta activa en esta pantalla.";
-    const answered = (screen.totalQuestions ?? 0) - (screen.unanswered?.length ?? 0);
-    const progress = screen.unanswered ? ` Llevas ${answered} de ${screen.totalQuestions} respondidas.` : "";
-    return `Pregunta ${(screen.questionIndex ?? 0) + 1} de ${screen.totalQuestions ?? ""}.${progress} ${screen.currentQuestion} ${(screen.currentOptions ?? []).map((option, index) => `Opción ${String.fromCharCode(65 + index)}: ${option.replace(/[.\s]+$/, "")}.`).join(" ")}`;
+    return spokenQuestion(
+      {
+        index: screen.questionIndex ?? 0,
+        total: screen.totalQuestions,
+        text: screen.currentQuestion,
+        options: screen.currentOptions,
+      },
+      { withOptions }
+    );
   }, []);
 
   const stopAssistant = useCallback(() => {
@@ -372,7 +390,10 @@ export function VoiceAssistant() {
           const total = screen.totalQuestions ?? 1;
           const index = Math.max(0, Math.min(command.index ?? screen.questionIndex ?? 0, total - 1));
           handlers.onSelectOption(command.letter, index);
-          const marked = `Marqué la opción ${command.letter} en la pregunta ${index + 1}.`;
+          const marked =
+            index === (screen.questionIndex ?? 0)
+              ? `Marcada la ${command.letter}.`
+              : `Marcada la ${command.letter} en la pregunta ${index + 1}.`;
           // Como un examen oral: después de marcar, pasa a la siguiente pregunta y la lee.
           if (index < total - 1) {
             handlers.onGoToQuestion ? handlers.onGoToQuestion(index + 1) : handlers.onNext?.();
@@ -383,8 +404,8 @@ export function VoiceAssistant() {
             const missing = (screenRef.current.unanswered ?? []).filter(number => number !== index + 1);
             respond(
               missing.length
-                ? `${marked} Esa es la última pregunta, pero aún te falta responder ${missing.length === 1 ? "la pregunta" : "las preguntas"} ${missing.join(", ")}. Di, por ejemplo: ir a la pregunta ${missing[0]}.`
-                : `${marked} Respondiste todas las preguntas. Cuando quieras enviar tus respuestas, di: guardar evaluación.`
+                ? `${marked} Era la última. ${spokenProgress(total, missing)} Di: pregunta ${missing[0]}.`
+                : `${marked} ${spokenProgress(total, [])}`
             );
           }, 200);
           return;
@@ -422,8 +443,30 @@ export function VoiceAssistant() {
           return;
         case "read_question":
           return respond(readQuestion());
+        case "read_question_text":
+          return respond(readQuestion(false));
+        case "read_options":
+          return respond(spokenOptions(screenRef.current.currentOptions));
+        case "read_option":
+          return respond(spokenOption(screenRef.current.currentOptions, command.letter));
+        case "evaluation_progress":
+          return respond(
+            spokenProgress(screenRef.current.totalQuestions ?? 0, screenRef.current.unanswered ?? [])
+          );
         case "navigate":
           envRef.current.navigate(command.path);
+          // Al abrir una evaluación se lee directamente la primera pregunta, como en un examen oral.
+          if (command.path === "/diagnostico" || command.path === "/postest") {
+            window.setTimeout(() => {
+              const screen = screenRef.current;
+              respond(
+                screen.currentQuestion
+                  ? `Abrí ${command.label}: ${screen.totalQuestions} preguntas. ${readQuestion()}`
+                  : `Abrí ${command.label}.`
+              );
+            }, 400);
+            return;
+          }
           return respond(`Abrí ${command.label}.`);
         case "back":
           envRef.current.goBack();
@@ -559,7 +602,9 @@ export function VoiceAssistant() {
 
   const handleUtterance = useCallback(
     (raw: string) => {
-      const text = raw.trim();
+      // "Oye Jason, abre el módulo dos" en plena conversación: se atiende solo la orden.
+      const wake = WAKE_PATTERN.exec(normalizeSpeech(raw));
+      const text = wake?.[1]?.trim() ? wake[1].trim() : raw.trim();
       if (!text) return;
       silenceCountRef.current = 0;
       lastUserTextRef.current = text;
