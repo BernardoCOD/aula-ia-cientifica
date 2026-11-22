@@ -7,6 +7,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { aiProvider } from "./ai";
+import { getDb } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -79,6 +80,9 @@ async function startServer() {
       console.warn(
         "[IA] Falta GEMINI_API_KEY en el archivo .env: el asistente solo entenderá órdenes directas."
       );
+    // Abre la base de datos al arrancar: así el registro muestra enseguida si es local o en la nube,
+    // o si falla la conexión, sin esperar a que alguien use la app.
+    void getDb();
   });
 }
 

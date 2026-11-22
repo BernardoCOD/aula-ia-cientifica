@@ -1,27 +1,21 @@
 # Estado del proyecto — dónde nos quedamos
 
-**Última actualización:** 2026-10-27
+**Última actualización:** 2026-11-22
 **Rama de trabajo en GitHub:** `claude/new-project-analysis-17vclq` (repositorio `BernardoCOD/aula-ia-cientifica`)
 
 ## 👉 Punto exacto donde se quedó Bernardo
 
-Publicando la app en la nube con `docs/GUIA_PUBLICAR_EN_LA_NUBE.md`:
+**La app está publicada en Render** (servicio `aula-ia-cientifica`, estado *Deployed*, región Virginia).
+Los Logs del 21 de noviembre confirman `[Panel docente] Usuario "docente", …` y `[IA] Usando Google Gemini.`
 
-- **Parte 1 (Turso):** hecha. La base de datos está creada y ya tiene la URL `libsql://…` y el token.
-- **Parte 2 (Render):** llegó hasta el **paso 6, "Pulsa Apply o Deploy Blueprint"**. Ya había llenado los
-  valores (`GEMINI_API_KEY`, `DATABASE_URL`, `DATABASE_AUTH_TOKEN`, `ADMIN_PASSWORD`).
+**Lo que falta para cerrar la publicación:**
 
-**Para retomar:**
-
-1. Entrar a https://dashboard.render.com y revisar si el Blueprint `aula-ia` y el servicio
-   `aula-ia-cientifica` ya existen:
-   - **Si no existen** (no llegó a pulsar Apply): repetir la Parte 2 desde el paso 3. Los valores de Turso
-     siguen sirviendo. Si perdió el token, crear uno nuevo en Turso.
-   - **Si existen:** abrir el servicio → pestaña **Logs** y seguir con el paso 7.
-2. **Paso 7:** en los Logs debe aparecer `[Database] Base de datos en la nube: …`, `[IA] Usando Google
-   Gemini.` y `[Panel docente] Usuario "docente", …`. Si hay errores, copiar las últimas líneas para
-   revisarlas.
-3. **Paso 8:** copiar el link (`https://….onrender.com`), probarlo y compartirlo (Parte 3 de la guía).
+1. Tras la actualización del 22 de noviembre, el servidor abre la base de datos al arrancar. En los Logs
+   debe aparecer `[Database] Base de datos en la nube: …turso.io`:
+   - si dice **"Base de datos local"**, falta `DATABASE_URL` en Environment y los datos se perderían;
+   - si dice **"No se pudo abrir la base de datos"**, revisar la URL y el token de Turso.
+2. Abrir el link (`https://….onrender.com`), probar a Jason y el panel `/docente`, y compartirlo con el docente.
+3. Después: **Fase 2 (uso sin manos)**, que espera el "ok" de Bernardo.
 
 ## Lo que ya está hecho
 
@@ -29,7 +23,7 @@ Publicando la app en la nube con `docs/GUIA_PUBLICAR_EN_LA_NUBE.md`:
 |---|---|
 | 0. Preparación | ✅ Plan en el repo, `docs/REQUISITOS.md`, `docs/DOCUMENTACION_TECNICA.md`, `CHANGELOG.md` |
 | 1. Independizar de Manus y participantes adultos | ✅ Sin Manus; ingreso solo con código de participante ("pe cero uno" → P01); a la IA solo llegan el código y el avance |
-| 5. Publicar (adelantada, en la nube) | 🟡 Código listo (`render.yaml`, soporte de Turso). **Falta terminar la publicación en Render** (ver arriba) |
+| 5. Publicar (adelantada, en la nube) | ✅ Publicada en Render. Falta confirmar en los Logs la conexión a Turso (ver arriba) |
 | 2. Uso sin manos | ⬜ Plan propuesto, esperando el "ok" de Bernardo (ver abajo) |
 | 3, 4, 6 | ⬜ Pendientes |
 
